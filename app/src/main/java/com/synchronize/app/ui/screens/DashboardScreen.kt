@@ -26,6 +26,18 @@ import com.synchronize.app.data.db.entity.KetoneReading
 import com.synchronize.app.data.db.entity.BiosignalSample
 import com.synchronize.app.ui.theme.*
 import com.synchronize.app.ui.viewmodel.MainViewModel
+import androidx.compose.ui.platform.LocalContext
+import com.synchronize.app.util.DexcomAuthManager
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import android.util.Log
+
 
 @Composable
 fun DashboardScreen(viewModel: MainViewModel) {
@@ -37,7 +49,10 @@ fun DashboardScreen(viewModel: MainViewModel) {
     val isListening by viewModel.isListening.collectAsState()
     val voiceTranscription by viewModel.voiceTranscription.collectAsState()
     val pendingMeal by viewModel.pendingMealEntry.collectAsState()
-
+    val isDexcomConnected by viewModel.isDexcomConnected.collectAsState()
+    val glucoseSyncCount by viewModel.glucoseSyncCount.collectAsState()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -121,6 +136,24 @@ fun DashboardScreen(viewModel: MainViewModel) {
         if (dataQuality.isNotEmpty()) {
             DataQualityCard(dataQuality = dataQuality)
         }
+
+        DexcomConnectCard(
+            isConnected = isDexcomConnected,
+            glucoseCount = glucoseSyncCount,
+            onConnectClick = {
+                DexcomAuthManager(context).launchAuthFlow()
+            },
+            onSyncClick = { viewModel.refreshLatestReadings() }
+        )
+        val scope = rememberCoroutineScope()
+
+        DexcomManualCodeEntry(
+            onCodeSubmit = { code ->
+                android.util.Log.d("DexcomAuth", "Code received: ${code.take(8)}")
+                viewModel.setDexcomConnected(true)
+            }
+        )
+
 
         // ── Status indicators ─────────────────────────────────
         StreamStatusCard(
@@ -334,4 +367,176 @@ fun ketoneColor(mmol: Double): Color = when {
     mmol <= 3.0 -> KetoneNutritional
     mmol <= 5.0 -> KetoneElevated
     else        -> KetoneHigh
+}
+
+// ── Dexcom Connect Card ───────────────────────────────────────
+
+
+@Composable
+fun DexcomConnectCard(
+    isConnected: Boolean,
+    glucoseCount: Int,
+    onConnectClick: () -> Unit,
+    onSyncClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(SyncDarkSurface)
+            .border(
+                1.dp,
+                if (isConnected) SyncGreen else SyncMagenta,
+                RoundedCornerShape(12.dp)
+            )
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Dexcom G7",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isConnected) SyncGreen else SyncWhite
+                )
+                Text(
+                    text = if (isConnected)
+                        "$glucoseCount readings synced"
+                    else
+                        "Not connected",
+                    fontSize = 11.sp,
+                    color = SyncLightGray
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .background(
+                        if (isConnected) SyncGreen else SyncMagenta,
+                        shape = RoundedCornerShape(6.dp)
+                    )
+            )
+        }
+
+        if (!isConnected) {
+            Button(
+                onClick = onConnectClick,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = SyncMagenta
+                )
+            ) {
+                Text(
+                    text = "Connect Dexcom G7",
+                    color = SyncBlack,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onSyncClick,
+                    modifier = Modifier.weight(1f),
+                    border = ButtonDefaults.outlinedButtonBorder.copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(SyncGreen)
+                    )
+                ) {
+                    Text("Sync Now", color = SyncGreen)
+                }
+                OutlinedButton(
+                    onClick = onConnectClick,
+                    modifier = Modifier.weight(1f),
+                    border = ButtonDefaults.outlinedButtonBorder.copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(SyncLightGray)
+                    )
+                ) {
+                    Text("Reconnect", color = SyncLightGray)
+                }
+            }
+        }
+    }
+}
+// ── Temporary Dev Tool: Manual Auth Code Entry ────────────────
+// Remove before production deployment
+
+@Composable
+fun DexcomManualCodeEntry(
+    onCodeSubmit: (String) -> Unit
+) {
+    var code by remember { mutableStateOf("") }
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(SyncDarkSurface)
+            .border(1.dp, SyncMidGray, RoundedCornerShape(12.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Dev: Manual Auth Code",
+                fontSize = 12.sp,
+                color = SyncLightGray
+            )
+            TextButton(onClick = { expanded = !expanded }) {
+                Text(
+                    text = if (expanded) "Hide" else "Show",
+                    color = SyncLightGray,
+                    fontSize = 11.sp
+                )
+            }
+        }
+
+        if (expanded) {
+            OutlinedTextField(
+                value = code,
+                onValueChange = { code = it },
+                label = {
+                    Text("Paste auth code here", color = SyncLightGray,
+                        fontSize = 11.sp)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = SyncGreen,
+                    unfocusedBorderColor = SyncMidGray,
+                    focusedTextColor = SyncWhite,
+                    unfocusedTextColor = SyncWhite,
+                    cursorColor = SyncGreen
+                ),
+                singleLine = false,
+                maxLines = 3
+            )
+
+            Button(
+                onClick = {
+                    if (code.isNotBlank()) {
+                        onCodeSubmit(code.trim())
+                        code = ""
+                        expanded = false
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = SyncDarkGray
+                )
+            ) {
+                Text("Submit Code", color = SyncGreen)
+            }
+        }
+    }
 }

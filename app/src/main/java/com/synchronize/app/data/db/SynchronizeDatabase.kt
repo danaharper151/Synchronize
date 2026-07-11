@@ -14,8 +14,6 @@ import com.synchronize.app.data.db.entity.GlucoseReading
 import com.synchronize.app.data.db.entity.KetoneReading
 import com.synchronize.app.data.db.entity.MealEntry
 import com.synchronize.app.data.db.entity.SleepSession
-import net.sqlcipher.database.SQLiteDatabase
-import net.sqlcipher.database.SupportFactory
 
 @Database(
     entities = [
@@ -39,20 +37,17 @@ abstract class SynchronizeDatabase : RoomDatabase() {
     companion object {
         @Volatile
         private var INSTANCE: SynchronizeDatabase? = null
-
-        // Passphrase for SQLCipher encryption
-        // In production this will be derived from BiometricPrompt / secure keystore
         private const val DB_NAME = "synchronize_db"
 
         fun getInstance(context: Context, passphrase: ByteArray): SynchronizeDatabase {
             return INSTANCE ?: synchronized(this) {
-                val factory = SupportFactory(passphrase)
+                // NOTE: SQLCipher encryption disabled for emulator development
+                // Re-enable with SupportFactory when testing on real A36 device
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     SynchronizeDatabase::class.java,
                     DB_NAME
                 )
-                    .openHelperFactory(factory)
                     .fallbackToDestructiveMigration(true)
                     .build()
                 INSTANCE = instance

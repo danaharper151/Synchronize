@@ -70,6 +70,21 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
     val unconfirmedMealEntries = repository.getUnconfirmedMealEntries()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // ── Dexcom auth state ─────────────────────────────────────────
+    private val _isDexcomConnected = MutableStateFlow(false)
+    val isDexcomConnected: StateFlow<Boolean> = _isDexcomConnected
+
+    private val _glucoseSyncCount = MutableStateFlow(0)
+    val glucoseSyncCount: StateFlow<Int> = _glucoseSyncCount
+
+    fun setDexcomConnected(connected: Boolean) {
+        _isDexcomConnected.value = connected
+    }
+
+    fun setGlucoseSyncCount(count: Int) {
+        _glucoseSyncCount.value = count
+    }
+
     // ── Init ──────────────────────────────────────────────────
 
     init {
