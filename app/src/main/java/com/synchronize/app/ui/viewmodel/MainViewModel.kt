@@ -9,6 +9,7 @@ import com.synchronize.app.data.db.entity.KetoneReading
 import com.synchronize.app.data.db.entity.MealEntry
 import com.synchronize.app.data.db.entity.SleepSession
 import com.synchronize.app.data.repository.SynchronizeRepository
+import com.synchronize.app.util.KetoMojoManager
 import com.synchronize.app.util.VoiceInputManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -78,6 +79,44 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
     fun stopVoiceListening() {
         voiceInputManager?.stopListening()
         _isListening.value = false
+    }
+
+    // ── Keto-Mojo BLE ─────────────────────────────────────────────
+    private var ketoMojoManager: KetoMojoManager? = null
+
+    private val _bleState = MutableStateFlow<KetoMojoManager.BleState>(
+        KetoMojoManager.BleState.Idle
+    )
+    val bleState: StateFlow<KetoMojoManager.BleState> = _bleState
+
+    private val _latestKetoneReading = MutableStateFlow<com.synchronize.app.data.db.entity.KetoneReading?>(null)
+    val latestKetoneReading: StateFlow<com.synchronize.app.data.db.entity.KetoneReading?> = _latestKetoneReading
+
+    fun initKetoMojo(context: android.content.Context) {
+        if (ketoMojoManager == null) {
+            ketoMojoManager = KetoMojoManager(context)
+            viewModelScope.launch {
+                ketoMojoManager?.state?.collect { state ->
+                    _bleState.value = state
+                    if (state is KetoMojoManager.BleState.ReadingReceived) {
+                        _latestKetoneReading.value = state.reading
+                        insertKetoneReading(state.reading)
+                    }
+                }
+            }
+        }
+    }
+
+    fun startKetoMojoScan() {
+        ketoMojoManager?.startScan()
+    }
+
+    fun stopKetoMojoScan() {
+        ketoMojoManager?.stopScan()
+    }
+
+    fun disconnectKetoMojo() {
+        ketoMojoManager?.disconnect()
     }
 
 

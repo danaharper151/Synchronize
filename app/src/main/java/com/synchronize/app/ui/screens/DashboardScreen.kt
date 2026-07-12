@@ -41,7 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import java.time.Instant
 import com.synchronize.app.data.db.entity.MealEntry
 import com.synchronize.app.util.VoiceInputManager
-
+import com.synchronize.app.util.KetoMojoManager
 
 @Composable
 fun DashboardScreen(viewModel: MainViewModel) {
@@ -55,6 +55,8 @@ fun DashboardScreen(viewModel: MainViewModel) {
     val pendingMeal by viewModel.pendingMealEntry.collectAsState()
     val isDexcomConnected by viewModel.isDexcomConnected.collectAsState()
     val glucoseSyncCount by viewModel.glucoseSyncCount.collectAsState()
+    val bleState by viewModel.bleState.collectAsState()
+    val latestKetoneReading by viewModel.latestKetoneReading.collectAsState()
     val context = LocalContext.current
     // Observe voice input state
     LaunchedEffect(Unit) {
@@ -201,6 +203,15 @@ fun DashboardScreen(viewModel: MainViewModel) {
                 android.util.Log.d("DexcomAuth", "Code received: ${code.take(8)}")
                 viewModel.setDexcomConnected(true)
             }
+        )
+        KetoMojoCard(
+            bleState = bleState,
+            latestReading = latestKetoneReading,
+            onScanClick = {
+                viewModel.initKetoMojo(context)
+                viewModel.startKetoMojoScan()
+            },
+            onDisconnectClick = { viewModel.disconnectKetoMojo() }
         )
 
 
@@ -508,6 +519,149 @@ fun DexcomConnectCard(
                     )
                 ) {
                     Text("Reconnect", color = SyncLightGray)
+                }
+            }
+        }
+    }
+}
+@Composable
+fun KetoMojoCard(
+    bleState: KetoMojoManager.BleState,
+    latestReading: KetoneReading?,
+    onScanClick: () -> Unit,
+    onDisconnectClick: () -> Unit
+) {
+    val isConnected = bleState is KetoMojoManager.BleState.Connected ||
+            bleState is KetoMojoManager.BleState.ReadingReceived
+    val isScanning = bleState is KetoMojoManager.BleState.Scanning
+    val isConnecting = bleState is KetoMojoManager.BleState.Connecting
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(SyncDarkSurface)
+            .border(
+                1.dp,
+                when {
+                    isConnected -> SyncGreen
+                    isScanning || isConnecting -> SyncMagenta
+                    else -> SyncMidGray
+                },
+                RoundedCornerShape(12.dp)
+            )
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Keto-Mojo GK+",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isConnected) SyncGreen else SyncWhite
+                )
+                Text(
+                    text = when (bleState) {
+                        is KetoMojoManager.BleState.Idle        -> "Not connected"
+                        is KetoMojoManager.BleState.Scanning    -> "Scanning..."
+                        is KetoMojoManager.BleState.DeviceFound -> "Device found"
+                        is KetoMojoManager.BleState.Connecting  -> "Connecting..."
+                        is KetoMojoManager.BleState.Connected   -> "Connected"
+                        is KetoMojoManager.BleState.ReadingReceived -> "Reading received"
+                        is KetoMojoManager.BleState.Disconnected -> "Disconnected"
+                        is KetoMojoManager.BleState.Error       -> bleState.message
+                    },
+                    fontSize = 11.sp,
+                    color = SyncLightGray
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .background(
+                        when {
+                            isConnected -> SyncGreen
+                            isScanning || isConnecting -> SyncMagenta
+                            else -> SyncMidGray
+                        },
+                        shape = RoundedCornerShape(6.dp)
+                    )
+            )
+        }
+
+        // Latest reading display
+        latestReading?.let { reading ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(SyncDarkGray)
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "%.1f".format(reading.betaHydroxybutyrate),
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = ketoneColor(reading.betaHydroxybutyrate)
+                    )
+                    Text(text = "mmol/L BHB", fontSize = 10.sp, color = SyncLightGray)
+                }
+                reading.glucoseMgDl?.let { glucose ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = glucose.toString(),
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = glucoseColor(glucose)
+                        )
+                        Text(text = "mg/dL Glucose", fontSize = 10.sp, color = SyncLightGray)
+                    }
+                }
+            }
+        }
+
+        // Action buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = onScanClick,
+                modifier = Modifier.weight(1f),
+                enabled = !isScanning && !isConnecting,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isConnected) SyncDarkGray else SyncMagenta,
+                    disabledContainerColor = SyncMidGray
+                )
+            ) {
+                Text(
+                    text = when {
+                        isScanning   -> "Scanning..."
+                        isConnecting -> "Connecting..."
+                        isConnected  -> "Scan Again"
+                        else         -> "Connect Meter"
+                    },
+                    color = if (isConnected) SyncLightGray else SyncBlack,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            if (isConnected) {
+                OutlinedButton(
+                    onClick = onDisconnectClick,
+                    modifier = Modifier.weight(1f),
+                    border = ButtonDefaults.outlinedButtonBorder.copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(SyncLightGray)
+                    )
+                ) {
+                    Text("Disconnect", color = SyncLightGray)
                 }
             }
         }
