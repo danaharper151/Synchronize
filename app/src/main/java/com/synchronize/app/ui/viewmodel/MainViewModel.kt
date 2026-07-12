@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.synchronize.app.util.HealthConnectManager
 
 class MainViewModel(private val repository: SynchronizeRepository) : ViewModel() {
 
@@ -118,6 +119,57 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
     fun disconnectKetoMojo() {
         ketoMojoManager?.disconnect()
     }
+    // ── Health Connect ────────────────────────────────────────────
+    private var healthConnectManager: HealthConnectManager? = null
+
+    private val _hcState = MutableStateFlow<HealthConnectManager.HcState>(
+        HealthConnectManager.HcState.Unavailable
+    )
+    val hcState: StateFlow<HealthConnectManager.HcState> = _hcState
+
+    private val _lastBiosignalSync = MutableStateFlow<Long?>(null)
+    val lastBiosignalSync: StateFlow<Long?> = _lastBiosignalSync
+
+    fun initHealthConnect(context: android.content.Context) {
+        if (healthConnectManager == null) {
+            healthConnectManager = HealthConnectManager(context)
+            viewModelScope.launch {
+                val ready = healthConnectManager?.initialize() ?: false
+                _hcState.value = if (ready)
+                    HealthConnectManager.HcState.Ready
+                else
+                    HealthConnectManager.HcState.Unavailable
+            }
+        }
+    }
+
+    fun syncBiosignals() {
+        viewModelScope.launch {
+            val samples = healthConnectManager?.syncBiosignals() ?: emptyList()
+            if (samples.isNotEmpty()) {
+                repository.insertBiosignalSamples(samples)
+                _lastBiosignalSync.value = System.currentTimeMillis()
+                refreshDataQuality()
+                android.util.Log.d("MainViewModel",
+                    "Synced ${samples.size} biosignal samples")
+            }
+        }
+    }
+
+    fun syncSleepSessions() {
+        viewModelScope.launch {
+            val sessions = healthConnectManager?.syncSleepSessions() ?: emptyList()
+            if (sessions.isNotEmpty()) {
+                sessions.forEach { repository.insertSleepSession(it) }
+                refreshDataQuality()
+                android.util.Log.d("MainViewModel",
+                    "Synced ${sessions.size} sleep sessions")
+            }
+        }
+    }
+
+    fun getHealthConnectPermissions() =
+        healthConnectManager?.requiredPermissions ?: emptySet()
 
 
     // ── All readings (for graph screens) ─────────────────────

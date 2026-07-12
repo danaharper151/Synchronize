@@ -42,6 +42,7 @@ import java.time.Instant
 import com.synchronize.app.data.db.entity.MealEntry
 import com.synchronize.app.util.VoiceInputManager
 import com.synchronize.app.util.KetoMojoManager
+import com.synchronize.app.util.HealthConnectManager
 
 @Composable
 fun DashboardScreen(viewModel: MainViewModel) {
@@ -57,10 +58,16 @@ fun DashboardScreen(viewModel: MainViewModel) {
     val glucoseSyncCount by viewModel.glucoseSyncCount.collectAsState()
     val bleState by viewModel.bleState.collectAsState()
     val latestKetoneReading by viewModel.latestKetoneReading.collectAsState()
+    val hcState by viewModel.hcState.collectAsState()
+    val lastBiosignalSync by viewModel.lastBiosignalSync.collectAsState()
     val context = LocalContext.current
     // Observe voice input state
     LaunchedEffect(Unit) {
         viewModel.initVoiceInput(context)
+        viewModel.initHealthConnect(context)
+    }
+    LaunchedEffect(Unit) {
+
         viewModel.voiceState.collect { voiceState ->
             when (voiceState) {
                 is VoiceInputManager.VoiceState.Result -> {
@@ -212,6 +219,20 @@ fun DashboardScreen(viewModel: MainViewModel) {
                 viewModel.startKetoMojoScan()
             },
             onDisconnectClick = { viewModel.disconnectKetoMojo() }
+        )
+        HealthConnectCard(
+            hcState = hcState,
+            lastSyncTime = lastBiosignalSync,
+            biosignalCount = dataQuality["biosignals"] ?: 0,
+            sleepCount = dataQuality["sleep"] ?: 0,
+            onSyncClick = {
+                viewModel.initHealthConnect(context)
+                viewModel.syncBiosignals()
+            },
+            onSyncSleepClick = {
+                viewModel.initHealthConnect(context)
+                viewModel.syncSleepSessions()
+            }
         )
 
 
@@ -413,21 +434,6 @@ fun StreamStatusRow(label: String, count: Int, unit: String) {
     }
 }
 
-// ── Helper functions ──────────────────────────────────────────
-
-fun glucoseColor(mgDl: Int): Color = when {
-    mgDl < 70  -> GlucoseLow
-    mgDl <= 140 -> GlucoseNormal
-    mgDl <= 180 -> GlucoseHigh
-    else        -> GlucoseVeryHigh
-}
-
-fun ketoneColor(mmol: Double): Color = when {
-    mmol < 0.5  -> KetoneSubKetosis
-    mmol <= 3.0 -> KetoneNutritional
-    mmol <= 5.0 -> KetoneElevated
-    else        -> KetoneHigh
-}
 
 // ── Dexcom Connect Card ───────────────────────────────────────
 
@@ -667,6 +673,166 @@ fun KetoMojoCard(
         }
     }
 }
+@Composable
+fun HealthConnectCard(
+    hcState: HealthConnectManager.HcState,
+    lastSyncTime: Long?,
+    biosignalCount: Int,
+    sleepCount: Int,
+    onSyncClick: () -> Unit,
+    onSyncSleepClick: () -> Unit
+) {
+    val isReady = hcState is HealthConnectManager.HcState.Ready
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(SyncDarkSurface)
+            .border(
+                1.dp,
+                if (isReady) SyncGreen else SyncMidGray,
+                RoundedCornerShape(12.dp)
+            )
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Galaxy Watch 7",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isReady) SyncGreen else SyncWhite
+                )
+                Text(
+                    text = when (hcState) {
+                        is HealthConnectManager.HcState.Unavailable ->
+                            "Health Connect unavailable"
+                        is HealthConnectManager.HcState.NotInstalled ->
+                            "Health Connect needs update"
+                        is HealthConnectManager.HcState.PermissionsRequired ->
+                            "Permissions required"
+                        is HealthConnectManager.HcState.Ready ->
+                            "$biosignalCount biosignals · $sleepCount sleep sessions"
+                        is HealthConnectManager.HcState.Error ->
+                            hcState.message
+                    },
+                    fontSize = 11.sp,
+                    color = SyncLightGray
+                )
+                lastSyncTime?.let {
+                    val mins = ((System.currentTimeMillis() - it) / 60000).toInt()
+                    Text(
+                        text = "Last sync: ${if (mins < 1) "just now" else "$mins min ago"}",
+                        fontSize = 10.sp,
+                        color = SyncLightGray
+                    )
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .background(
+                        if (isReady) SyncGreen else SyncMidGray,
+                        shape = RoundedCornerShape(6.dp)
+                    )
+            )
+        }
+
+        // Biosignal stats row
+        if (biosignalCount > 0 || sleepCount > 0) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(SyncDarkGray)
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = biosignalCount.toString(),
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = SyncGreen
+                    )
+                    Text(text = "Biosignals", fontSize = 10.sp, color = SyncLightGray)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = sleepCount.toString(),
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = SyncGreen
+                    )
+                    Text(text = "Sleep Sessions", fontSize = 10.sp, color = SyncLightGray)
+                }
+            }
+        }
+
+        // Action buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = onSyncClick,
+                modifier = Modifier.weight(1f),
+                enabled = isReady,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = SyncGreen,
+                    disabledContainerColor = SyncMidGray
+                )
+            ) {
+                Text(
+                    text = "Sync Biosignals",
+                    color = SyncBlack,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
+            }
+            Button(
+                onClick = onSyncSleepClick,
+                modifier = Modifier.weight(1f),
+                enabled = isReady,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = SyncDarkGray,
+                    disabledContainerColor = SyncMidGray
+                )
+            ) {
+                Text(
+                    text = "Sync Sleep",
+                    color = if (isReady) SyncGreen else SyncLightGray,
+                    fontSize = 12.sp
+                )
+            }
+        }
+    }
+}
+// ── Helper functions ──────────────────────────────────────────
+
+fun glucoseColor(mgDl: Int): Color = when {
+    mgDl < 70  -> GlucoseLow
+    mgDl <= 140 -> GlucoseNormal
+    mgDl <= 180 -> GlucoseHigh
+    else        -> GlucoseVeryHigh
+}
+
+fun ketoneColor(mmol: Double): Color = when {
+    mmol < 0.5  -> KetoneSubKetosis
+    mmol <= 3.0 -> KetoneNutritional
+    mmol <= 5.0 -> KetoneElevated
+    else        -> KetoneHigh
+}
+
+
+
+
 // ── Temporary Dev Tool: Manual Auth Code Entry ────────────────
 // Remove before production deployment
 
