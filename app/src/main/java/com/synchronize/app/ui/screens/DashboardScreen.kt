@@ -37,6 +37,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import android.util.Log
+import androidx.compose.runtime.LaunchedEffect
+import java.time.Instant
+import com.synchronize.app.data.db.entity.MealEntry
+import com.synchronize.app.util.VoiceInputManager
 
 
 @Composable
@@ -52,6 +56,48 @@ fun DashboardScreen(viewModel: MainViewModel) {
     val isDexcomConnected by viewModel.isDexcomConnected.collectAsState()
     val glucoseSyncCount by viewModel.glucoseSyncCount.collectAsState()
     val context = LocalContext.current
+    // Observe voice input state
+    LaunchedEffect(Unit) {
+        viewModel.initVoiceInput(context)
+        viewModel.voiceState.collect { voiceState ->
+            when (voiceState) {
+                is VoiceInputManager.VoiceState.Result -> {
+                    viewModel.setVoiceTranscription(voiceState.text)
+                    viewModel.setListening(false)
+                    voiceState.macros?.let { macros ->
+                        val now = System.currentTimeMillis()
+                        viewModel.setPendingMealEntry(
+                            MealEntry(
+                                deviceTimestamp   = now,
+                                receiveTimestamp  = now,
+                                calories          = macros.calories,
+                                fatGrams          = macros.fatGrams,
+                                proteinGrams      = macros.proteinGrams,
+                                netCarbGrams      = macros.netCarbGrams,
+                                fiberGrams        = macros.fiberGrams,
+                                totalCarbGrams    = macros.totalCarbGrams,
+                                ketogenicRatio    = macros.ketogenicRatio,
+                                parsingMethod     = macros.parsingMethod,
+                                mealLabel         = null,
+                                rawTranscription  = voiceState.text,
+                                caffeineMg        = null,
+                                meditationMinutes = null,
+                                meditationSession = null
+                            )
+                        )
+                    }
+                }
+                is VoiceInputManager.VoiceState.Error -> {
+                    viewModel.setVoiceTranscription("Error: ${voiceState.message}")
+                    viewModel.setListening(false)
+                }
+                is VoiceInputManager.VoiceState.Listening -> {
+                    viewModel.setVoiceTranscription("Listening...")
+                }
+                else -> {}
+            }
+        }
+    }
     val scope = rememberCoroutineScope()
     Column(
         modifier = Modifier
@@ -118,13 +164,16 @@ fun DashboardScreen(viewModel: MainViewModel) {
             isListening = isListening,
             transcription = voiceTranscription,
             pendingMeal = pendingMeal?.let {
-                "C:${it.netCarbGrams}g F:${it.fatGrams}g P:${it.proteinGrams}g " +
-                        "Fib:${it.fiberGrams}g | ${it.calories} cal"
+                "Cal:${it.calories} | F:${it.fatGrams}g | P:${it.proteinGrams}g | NC:${it.netCarbGrams}g | Fib:${it.fiberGrams}g"
             },
             onMicClick = {
-                viewModel.setListening(!isListening)
-                if (!isListening) {
-                    // Voice recognition will be wired here in next step
+                if (isListening) {
+                    viewModel.stopVoiceListening()
+                    viewModel.setListening(false)
+                } else {
+                    viewModel.initVoiceInput(context)
+                    viewModel.startVoiceListening()
+                    viewModel.setListening(true)
                     viewModel.setVoiceTranscription("Listening...")
                 }
             },

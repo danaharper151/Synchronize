@@ -9,6 +9,7 @@ import com.synchronize.app.data.db.entity.KetoneReading
 import com.synchronize.app.data.db.entity.MealEntry
 import com.synchronize.app.data.db.entity.SleepSession
 import com.synchronize.app.data.repository.SynchronizeRepository
+import com.synchronize.app.util.VoiceInputManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -49,6 +50,36 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
 
     private val _isListening = MutableStateFlow(false)
     val isListening: StateFlow<Boolean> = _isListening
+
+    // ── Voice input manager ───────────────────────────────────────
+    private var voiceInputManager: VoiceInputManager? = null
+
+    private val _voiceState = MutableStateFlow<VoiceInputManager.VoiceState>(
+        VoiceInputManager.VoiceState.Idle
+    )
+    val voiceState: StateFlow<VoiceInputManager.VoiceState> = _voiceState
+
+    fun initVoiceInput(context: android.content.Context) {
+        if (voiceInputManager == null) {
+            voiceInputManager = VoiceInputManager(context)
+            viewModelScope.launch {
+                voiceInputManager?.state?.collect { state ->
+                    _voiceState.value = state
+                }
+            }
+        }
+    }
+
+    fun startVoiceListening() {
+        voiceInputManager?.startListening()
+        _isListening.value = true
+    }
+
+    fun stopVoiceListening() {
+        voiceInputManager?.stopListening()
+        _isListening.value = false
+    }
+
 
     // ── All readings (for graph screens) ─────────────────────
 
