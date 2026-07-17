@@ -1,0 +1,177 @@
+package com.synchronize.app.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.synchronize.app.ui.theme.*
+import com.synchronize.app.ui.viewmodel.MainViewModel
+import com.synchronize.app.util.Constants
+
+@Composable
+fun SettingsScreen(viewModel: MainViewModel) {
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(SyncBlack)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp)
+            .padding(top = 32.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            text = "Settings",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = SyncGreen,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center
+        )
+
+        // ── Study configuration ───────────────────────────────
+        SettingsSection(title = "Study Configuration") {
+            SettingsInfoRow("Subject ID", Constants.SUBJECT_ID)
+            SettingsInfoRow("Data collection", "30-day longitudinal")
+            SettingsInfoRow("Ketone readings/day", "4–5 at standardized times")
+            SettingsInfoRow("ML models", "Rocket + Random Forest")
+            SettingsInfoRow("Evaluation", "Leave-One-Out CV (LOOCV)")
+        }
+
+        // ── Device configuration ──────────────────────────────
+        SettingsSection(title = "Devices") {
+            SettingsInfoRow("CGM", "Dexcom G7 — 5-min poll interval")
+            SettingsInfoRow("Smartwatch", "Samsung Galaxy Watch 7")
+            SettingsInfoRow("Ketone meter", "Keto-Mojo GK+ via BLE")
+            SettingsInfoRow("Environment", if (Constants.USE_SANDBOX) "Sandbox" else "Production")
+        }
+
+        // ── Clinical thresholds ───────────────────────────────
+        SettingsSection(title = "Clinical Thresholds") {
+            SettingsInfoRow("Glucose low", "${Constants.GLUCOSE_LOW} mg/dL")
+            SettingsInfoRow("Glucose high", "${Constants.GLUCOSE_HIGH} mg/dL")
+            SettingsInfoRow("Ketosis threshold", "${Constants.KETONE_SUB_KETOSIS} mmol/L")
+            SettingsInfoRow("Nutritional ketosis", "0.5 – ${Constants.KETONE_NUTRITIONAL} mmol/L")
+            SettingsInfoRow("Elevated ketones", "> ${Constants.KETONE_ELEVATED} mmol/L")
+        }
+
+        // ── Security ──────────────────────────────────────────
+        SettingsSection(title = "Security & Privacy") {
+            SettingsInfoRow("Database encryption", "SQLCipher AES-256")
+            SettingsInfoRow("API transport", "HTTPS with certificate pinning")
+            SettingsInfoRow("Authentication", "BiometricPrompt")
+            SettingsInfoRow("De-identification", "Timestamp offset + PII suppression")
+            SettingsInfoRow("Public release", "PhysioNet on thesis completion")
+        }
+
+        // ── About ─────────────────────────────────────────────
+        SettingsSection(title = "About Synchronize") {
+            SettingsInfoRow("Version", "1.0.0 — Development build")
+            SettingsInfoRow("Platform", "Android 14+ / Kotlin / Jetpack Compose")
+            SettingsInfoRow("Architecture", "MVVM + Room + Coroutines")
+            SettingsInfoRow("Repository", "github.com/danaharper151/Synchronize")
+            SettingsInfoRow("Thesis", "MSCS — CSUCI 2025")
+        }
+
+        // ── Danger zone ───────────────────────────────────────
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(SyncDarkSurface)
+                .border(1.dp, SyncError, RoundedCornerShape(12.dp))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Developer Tools",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = SyncError
+            )
+            Text(
+                text = "These options are for development only and will be removed before production deployment.",
+                fontSize = 11.sp,
+                color = SyncLightGray
+            )
+            OutlinedButton(
+                onClick = { /* Switch sandbox/production */ },
+                modifier = Modifier.fillMaxWidth(),
+                border = ButtonDefaults.outlinedButtonBorder.copy(
+                    brush = androidx.compose.ui.graphics.SolidColor(SyncError)
+                )
+            ) {
+                Text(
+                    text = if (Constants.USE_SANDBOX)
+                        "Currently: Sandbox — tap to switch to Production"
+                    else
+                        "Currently: Production — tap to switch to Sandbox",
+                    color = SyncError,
+                    fontSize = 12.sp
+                )
+            }
+        }
+    }
+}
+
+// ── Settings section wrapper ──────────────────────────────────
+
+@Composable
+fun SettingsSection(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(SyncDarkSurface)
+            .border(1.dp, SyncMidGray, RoundedCornerShape(12.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = title,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = SyncGreen
+        )
+        content()
+    }
+}
+
+// ── Settings info row ─────────────────────────────────────────
+
+@Composable
+fun SettingsInfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            color = SyncLightGray,
+            modifier = Modifier.weight(0.45f)
+        )
+        Text(
+            text = value,
+            fontSize = 12.sp,
+            color = SyncWhite,
+            modifier = Modifier.weight(0.55f),
+            textAlign = TextAlign.End
+        )
+    }
+}

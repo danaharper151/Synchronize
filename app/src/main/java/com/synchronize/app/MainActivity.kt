@@ -14,7 +14,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.synchronize.app.data.repository.SynchronizeRepository
-import com.synchronize.app.ui.screens.DashboardScreen
+import com.synchronize.app.ui.NavGraph
 import com.synchronize.app.ui.theme.SynchronizeTheme
 import com.synchronize.app.ui.viewmodel.MainViewModel
 
@@ -60,7 +60,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             SynchronizeTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    DashboardScreen(viewModel = viewModel)
+                    NavGraph(viewModel = viewModel)
                 }
             }
         }
