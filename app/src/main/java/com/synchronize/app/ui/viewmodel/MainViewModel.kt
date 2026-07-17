@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import com.synchronize.app.util.HealthConnectManager
+// import com.synchronize.app.util.DashboardWebSocketServer
+import kotlinx.coroutines.Dispatchers
 
 class MainViewModel(private val repository: SynchronizeRepository) : ViewModel() {
 
@@ -171,6 +173,51 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
     fun getHealthConnectPermissions() =
         healthConnectManager?.requiredPermissions ?: emptySet()
 
+   /* // ── WebSocket dashboard server ────────────────────────────────
+    private var wsServer: DashboardWebSocketServer? = null
+
+    private val _wsClientCount = MutableStateFlow(0)
+    val wsClientCount: StateFlow<Int> = _wsClientCount
+
+    fun startWebSocketServer() {
+        if (wsServer?.isRunning() == true) return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                wsServer = DashboardWebSocketServer(8080)
+                wsServer?.start()
+                android.util.Log.d("MainViewModel", "WebSocket server started on port 8080")
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "WebSocket server failed to start", e)
+            }
+        }
+    }
+
+    fun stopWebSocketServer() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                wsServer?.stop()
+                wsServer = null
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "WebSocket server stop error", e)
+            }
+        }
+    }
+
+    fun broadcastAllData() {
+        viewModelScope.launch {
+            val server = wsServer ?: return@launch
+            server.broadcastGlucose(allGlucoseReadings.value)
+            server.broadcastKetones(allKetoneReadings.value)
+            server.broadcastBiosignals(allBiosignalSamples.value)
+            server.broadcastMeals(allMealEntries.value)
+            server.broadcastSleep(allSleepSessions.value)
+            server.broadcastDataQuality(dataQuality.value)
+            _wsClientCount.value = server.clientCount()
+        }
+    }
+
+
+*/
 
     // ── All readings (for graph screens) ─────────────────────
 
@@ -212,6 +259,10 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
     init {
         refreshLatestReadings()
         refreshDataQuality()
+        viewModelScope.launch(Dispatchers.IO) {
+            kotlinx.coroutines.delay(3000) // wait for UI to load first
+            // startWebSocketServer()
+        }
     }
 
     // ── Refresh functions ─────────────────────────────────────
@@ -253,6 +304,7 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
             repository.insertKetoneReading(reading)
             _latestKetone.value = reading
             refreshDataQuality()
+            //broadcastAllData()  // push to web dashboard immediately
         }
     }
 
@@ -284,6 +336,7 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
                 _pendingMealEntry.value = null
                 _latestMeal.value = entry
                 refreshDataQuality()
+                //broadcastAllData()  // push to web dashboard immediately
             }
         }
     }

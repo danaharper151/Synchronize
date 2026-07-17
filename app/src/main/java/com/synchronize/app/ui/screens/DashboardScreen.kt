@@ -60,6 +60,7 @@ fun DashboardScreen(viewModel: MainViewModel) {
     val latestKetoneReading by viewModel.latestKetoneReading.collectAsState()
     val hcState by viewModel.hcState.collectAsState()
     val lastBiosignalSync by viewModel.lastBiosignalSync.collectAsState()
+    // val wsClientCount by viewModel.wsClientCount.collectAsState()
     val context = LocalContext.current
     // Observe voice input state
     LaunchedEffect(Unit) {
@@ -128,14 +129,46 @@ fun DashboardScreen(viewModel: MainViewModel) {
             textAlign = TextAlign.Center
         )
         Text(
-            text = "Ketone Prediction Research Dashboard",
+            text = "Health Data Collection and Synchronizaton Platform",
             fontSize = 12.sp,
             color = SyncLightGray,
             modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.Center
         )
+        /*Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(
+                        if (wsClientCount > 0) SyncGreen else SyncMidGray,
+                        shape = RoundedCornerShape(4.dp)
+                    )
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = if (wsClientCount > 0)
+                    "Web dashboard connected ($wsClientCount client)"
+                else
+                    "Web dashboard: waiting on port 8080",
+                fontSize = 10.sp,
+                color = if (wsClientCount > 0) SyncGreen else SyncLightGray
+            )
+        }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        // ── Broadcast button- push data to the web dashboard ─────────────────────────────────
+        if (wsClientCount > 0) {
+            Button(
+                onClick = { viewModel.broadcastAllData() },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = SyncDarkGray)
+            ) {
+                Text("Broadcast to Web Dashboard", color = SyncGreen, fontSize = 12.sp)
+            }
+        }*/
 
         // ── Summary cards row ─────────────────────────────────
         Row(

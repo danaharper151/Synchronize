@@ -96,4 +96,8 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+
+    // Web Dashboard
+    // implementation("org.java-websocket:Java-WebSocket:1.5.7")
+
 }
