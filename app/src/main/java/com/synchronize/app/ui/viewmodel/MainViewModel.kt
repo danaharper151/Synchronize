@@ -84,6 +84,39 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
         _isListening.value = false
     }
 
+    // ── Daily covariates ──────────────────────────────────────────
+    private val _caffeineMg = MutableStateFlow(400.0) // 46g grounds = ~400mg caffeine
+    val caffeineMg: StateFlow<Double> = _caffeineMg
+
+    private val _meditationAmMinutes = MutableStateFlow(0)
+    val meditationAmMinutes: StateFlow<Int> = _meditationAmMinutes
+
+    private val _meditationPmMinutes = MutableStateFlow(0)
+    val meditationPmMinutes: StateFlow<Int> = _meditationPmMinutes
+
+    private val _covariatesLoggedToday = MutableStateFlow(false)
+    val covariatesLoggedToday: StateFlow<Boolean> = _covariatesLoggedToday
+
+    fun logDailyCovariates(
+        caffeineMg: Double,
+        meditationAm: Int,
+        meditationPm: Int
+    ) {
+        _caffeineMg.value = caffeineMg
+        _meditationAmMinutes.value = meditationAm
+        _meditationPmMinutes.value = meditationPm
+        _covariatesLoggedToday.value = true
+        android.util.Log.d("MainViewModel",
+            "Daily covariates logged: ${caffeineMg}mg caffeine, " +
+                    "AM ${meditationAm}min, PM ${meditationPm}min")
+    }
+
+    fun resetDailyCovariates() {
+        _covariatesLoggedToday.value = false
+        _meditationAmMinutes.value = 0
+        _meditationPmMinutes.value = 0
+    }
+
     // ── Keto-Mojo BLE ─────────────────────────────────────────────
     private var ketoMojoManager: KetoMojoManager? = null
 

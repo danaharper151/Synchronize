@@ -60,6 +60,10 @@ fun DashboardScreen(viewModel: MainViewModel) {
     val latestKetoneReading by viewModel.latestKetoneReading.collectAsState()
     val hcState by viewModel.hcState.collectAsState()
     val lastBiosignalSync by viewModel.lastBiosignalSync.collectAsState()
+    val caffeineMg by viewModel.caffeineMg.collectAsState()
+    val meditationAm by viewModel.meditationAmMinutes.collectAsState()
+    val meditationPm by viewModel.meditationPmMinutes.collectAsState()
+    val covariatesLogged by viewModel.covariatesLoggedToday.collectAsState()
     // val wsClientCount by viewModel.wsClientCount.collectAsState()
     val context = LocalContext.current
     // Observe voice input state
@@ -244,6 +248,18 @@ fun DashboardScreen(viewModel: MainViewModel) {
                 viewModel.setDexcomConnected(true)
             }
         )
+
+        DailyCovariatesCard(
+            caffeineMg = caffeineMg,
+            meditationAm = meditationAm,
+            meditationPm = meditationPm,
+            isLogged = covariatesLogged,
+            onLog = { caffeine, am, pm ->
+                viewModel.logDailyCovariates(caffeine, am, pm)
+            },
+            onReset = { viewModel.resetDailyCovariates() }
+        )
+
         KetoMojoCard(
             bleState = bleState,
             latestReading = latestKetoneReading,
@@ -938,6 +954,217 @@ fun DexcomManualCodeEntry(
                 )
             ) {
                 Text("Submit Code", color = SyncGreen)
+            }
+        }
+    }
+}
+
+@Composable
+fun DailyCovariatesCard(
+    caffeineMg: Double,
+    meditationAm: Int,
+    meditationPm: Int,
+    isLogged: Boolean,
+    onLog: (caffeine: Double, am: Int, pm: Int) -> Unit,
+    onReset: () -> Unit
+) {
+    var caffeineInput by remember { mutableStateOf(caffeineMg.toInt().toString()) }
+    var amInput by remember { mutableStateOf(if (meditationAm > 0) meditationAm.toString() else "") }
+    var pmInput by remember { mutableStateOf(if (meditationPm > 0) meditationPm.toString() else "") }
+    var expanded by remember { mutableStateOf(!isLogged) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(SyncDarkSurface)
+            .border(
+                1.dp,
+                if (isLogged) SyncGreen else SyncMagenta,
+                RoundedCornerShape(12.dp)
+            )
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // ── Header ────────────────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Daily Covariates",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isLogged) SyncGreen else SyncWhite
+                )
+                Text(
+                    text = if (isLogged)
+                        "Logged ✓ — caffeine ${caffeineMg.toInt()}mg · " +
+                                "AM ${meditationAm}min · PM ${meditationPm}min"
+                    else
+                        "Log today's caffeine and meditation",
+                    fontSize = 11.sp,
+                    color = SyncLightGray
+                )
+            }
+            TextButton(onClick = { expanded = !expanded }) {
+                Text(
+                    text = if (expanded) "Hide" else "Edit",
+                    color = if (isLogged) SyncLightGray else SyncMagenta,
+                    fontSize = 11.sp
+                )
+            }
+        }
+
+        // ── Entry fields ──────────────────────────────────────
+        if (expanded) {
+            // Caffeine
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Caffeine (mg)",
+                        fontSize = 11.sp,
+                        color = SyncLightGray
+                    )
+                    Text(
+                        text = "46g grounds ≈ 400mg (~5 cups)",
+                        fontSize = 9.sp,
+                        color = SyncMidGray
+                    )
+                }
+                OutlinedTextField(
+                    value = caffeineInput,
+                    onValueChange = { caffeineInput = it },
+                    modifier = Modifier.width(100.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = SyncGreen,
+                        unfocusedBorderColor = SyncMidGray,
+                        focusedTextColor     = SyncWhite,
+                        unfocusedTextColor   = SyncWhite,
+                        cursorColor          = SyncGreen
+                    ),
+                    singleLine = true,
+                    suffix = { Text("mg", color = SyncLightGray, fontSize = 11.sp) }
+                )
+            }
+
+            HorizontalDivider(color = SyncMidGray, thickness = 0.5.dp)
+
+            // Meditation AM
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Meditation AM",
+                        fontSize = 11.sp,
+                        color = SyncLightGray
+                    )
+                    Text(
+                        text = "Morning session duration",
+                        fontSize = 9.sp,
+                        color = SyncMidGray
+                    )
+                }
+                OutlinedTextField(
+                    value = amInput,
+                    onValueChange = { amInput = it },
+                    modifier = Modifier.width(100.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = SyncGreen,
+                        unfocusedBorderColor = SyncMidGray,
+                        focusedTextColor     = SyncWhite,
+                        unfocusedTextColor   = SyncWhite,
+                        cursorColor          = SyncGreen
+                    ),
+                    singleLine = true,
+                    suffix = { Text("min", color = SyncLightGray, fontSize = 11.sp) }
+                )
+            }
+
+            // Meditation PM
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Meditation PM",
+                        fontSize = 11.sp,
+                        color = SyncLightGray
+                    )
+                    Text(
+                        text = "Evening session duration",
+                        fontSize = 9.sp,
+                        color = SyncMidGray
+                    )
+                }
+                OutlinedTextField(
+                    value = pmInput,
+                    onValueChange = { pmInput = it },
+                    modifier = Modifier.width(100.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = SyncGreen,
+                        unfocusedBorderColor = SyncMidGray,
+                        focusedTextColor     = SyncWhite,
+                        unfocusedTextColor   = SyncWhite,
+                        cursorColor          = SyncGreen
+                    ),
+                    singleLine = true,
+                    suffix = { Text("min", color = SyncLightGray, fontSize = 11.sp) }
+                )
+            }
+
+            // ── Action buttons ────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = {
+                        val caffeine = caffeineInput.toDoubleOrNull() ?: 400.0
+                        val am = amInput.toIntOrNull() ?: 0
+                        val pm = pmInput.toIntOrNull() ?: 0
+                        onLog(caffeine, am, pm)
+                        expanded = false
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SyncGreen
+                    )
+                ) {
+                    Text(
+                        text = "Log Today",
+                        color = SyncBlack,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (isLogged) {
+                    OutlinedButton(
+                        onClick = {
+                            onReset()
+                            caffeineInput = "400"
+                            amInput = ""
+                            pmInput = ""
+                            expanded = true
+                        },
+                        modifier = Modifier.weight(1f),
+                        border = ButtonDefaults.outlinedButtonBorder.copy(
+                            brush = androidx.compose.ui.graphics.SolidColor(SyncLightGray)
+                        )
+                    ) {
+                        Text("Reset", color = SyncLightGray)
+                    }
+                }
             }
         }
     }
