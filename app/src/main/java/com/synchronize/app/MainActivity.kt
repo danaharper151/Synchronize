@@ -4,27 +4,32 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import com.synchronize.app.data.repository.SynchronizeRepository
 import com.synchronize.app.ui.NavGraph
+import com.synchronize.app.ui.screens.LockScreen
 import com.synchronize.app.ui.theme.SynchronizeTheme
 import com.synchronize.app.ui.viewmodel.MainViewModel
+import com.synchronize.app.util.BiometricAuthManager
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     private val viewModel: MainViewModel by viewModels {
         MainViewModel.Factory(
             SynchronizeRepository(SynchronizeApp.instance.database)
         )
     }
+
+    private lateinit var authManager: BiometricAuthManager
 
     // ── Permission launchers ──────────────────────────────────
 
@@ -39,7 +44,8 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         permissions.forEach { (perm, granted) ->
-            android.util.Log.d("MainActivity", "$perm: ${if (granted) "granted" else "denied"}")
+            android.util.Log.d("MainActivity",
+                "$perm: ${if (granted) "granted" else "denied"}")
         }
     }
 
@@ -47,7 +53,8 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         permissions.forEach { (perm, granted) ->
-            android.util.Log.d("MainActivity", "$perm: ${if (granted) "granted" else "denied"}")
+            android.util.Log.d("MainActivity",
+                "$perm: ${if (granted) "granted" else "denied"}")
         }
     }
 
@@ -56,13 +63,44 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        authManager = BiometricAuthManager(this)
         requestAllPermissions()
+
         setContent {
             SynchronizeTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    NavGraph(viewModel = viewModel)
+                    AppContent()
                 }
             }
+        }
+    }
+
+    // ── App content with auth gate ────────────────────────────
+
+    @Composable
+    fun AppContent() {
+        val authState by authManager.authState.collectAsState()
+        var isAuthenticated by remember { mutableStateOf(false) }
+
+        if (!isAuthenticated) {
+            LockScreen(
+                authManager = authManager,
+                activity    = this,
+                onAuthenticated = {
+                    isAuthenticated = true
+                }
+            )
+            // Auto-trigger biometric prompt on first launch
+            LaunchedEffect(Unit) {
+                if (authManager.canAuthenticate()) {
+                    authManager.authenticate(this@MainActivity)
+                } else {
+                    // No biometric available — skip lock screen
+                    isAuthenticated = true
+                }
+            }
+        } else {
+            NavGraph(viewModel = viewModel)
         }
     }
 
@@ -87,9 +125,8 @@ class MainActivity : ComponentActivity() {
                 blePerms.add(Manifest.permission.BLUETOOTH_SCAN)
             if (!hasPermission(Manifest.permission.BLUETOOTH_CONNECT))
                 blePerms.add(Manifest.permission.BLUETOOTH_CONNECT)
-            if (blePerms.isNotEmpty()) {
+            if (blePerms.isNotEmpty())
                 requestBlePermissions.launch(blePerms.toTypedArray())
-            }
         }
     }
 
@@ -99,9 +136,8 @@ class MainActivity : ComponentActivity() {
             locationPerms.add(Manifest.permission.ACCESS_FINE_LOCATION)
         if (!hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION))
             locationPerms.add(Manifest.permission.ACCESS_COARSE_LOCATION)
-        if (locationPerms.isNotEmpty()) {
+        if (locationPerms.isNotEmpty())
             requestLocationPermission.launch(locationPerms.toTypedArray())
-        }
     }
 
     private fun hasPermission(permission: String): Boolean =
