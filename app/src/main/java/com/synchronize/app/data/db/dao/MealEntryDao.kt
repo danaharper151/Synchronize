@@ -55,4 +55,7 @@ interface MealEntryDao {
 
     @Query("DELETE FROM meal_entries")
     suspend fun deleteAll()
+
+    @Query("DELETE FROM meal_entries WHERE id = :id")
+    suspend fun deleteById(id: Long)
 }

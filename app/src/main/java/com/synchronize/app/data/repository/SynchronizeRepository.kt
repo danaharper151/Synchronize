@@ -131,6 +131,9 @@ class SynchronizeRepository(private val db: SynchronizeDatabase) {
     suspend fun confirmMealEntry(id: Long) =
         db.mealEntryDao().confirmEntry(id)
 
+    suspend fun deleteMealEntry(id: Long) =
+        db.mealEntryDao().deleteById(id)
+
     suspend fun getTotalNetCarbsInRange(startTime: Long, endTime: Long): Double? =
         db.mealEntryDao().getTotalNetCarbsInRange(startTime, endTime)
 

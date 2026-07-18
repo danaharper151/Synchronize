@@ -374,6 +374,22 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
         }
     }
 
+    fun deleteMealEntry(id: Long) {
+        viewModelScope.launch {
+            repository.deleteMealEntry(id)
+            refreshDataQuality()
+            android.util.Log.d("MainViewModel", "Deleted meal entry $id")
+        }
+    }
+
+    fun updateMealEntry(entry: com.synchronize.app.data.db.entity.MealEntry) {
+        viewModelScope.launch {
+            repository.updateMealEntry(entry)
+            refreshDataQuality()
+            android.util.Log.d("MainViewModel", "Updated meal entry ${entry.id}")
+        }
+    }
+
     fun discardPendingMealEntry() {
         _pendingMealEntry.value = null
         _voiceTranscription.value = null
