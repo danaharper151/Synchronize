@@ -73,7 +73,7 @@ fun MealScreen(viewModel: MainViewModel) {
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .background(SyncDarkSurface)
-                        .border(1.dp, SyncGreen, RoundedCornerShape(12.dp))
+                        .border(1.dp, SyncMagenta, RoundedCornerShape(12.dp))
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -119,7 +119,7 @@ fun MealScreen(viewModel: MainViewModel) {
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(SyncDarkSurface)
-                    .border(1.dp, SyncMidGray, RoundedCornerShape(12.dp))
+                    .border(1.dp, SyncMagenta, RoundedCornerShape(12.dp))
                     .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {

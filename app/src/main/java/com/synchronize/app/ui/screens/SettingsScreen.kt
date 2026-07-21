@@ -84,6 +84,51 @@ fun SettingsScreen(viewModel: MainViewModel) {
             SettingsInfoRow("Thesis", "MSCS — CSUCI 2025")
         }
 
+        SettingsSection(title = "Reading Reminders") {
+            val remindersEnabled by viewModel.remindersEnabled.collectAsState()
+            val context = androidx.compose.ui.platform.LocalContext.current
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = if (remindersEnabled) "Reminders ON" else "Reminders OFF",
+                        fontSize = 13.sp,
+                        color = if (remindersEnabled) SyncGreen else SyncLightGray
+                    )
+                    Text(
+                        text = "7:30 · 11:30 · 13:30 · 17:30 · 21:30",
+                        fontSize = 10.sp,
+                        color = SyncLightGray
+                    )
+                }
+                Switch(
+                    checked = remindersEnabled,
+                    onCheckedChange = { enabled ->
+                        if (enabled) viewModel.enableReminders(context)
+                        else viewModel.disableReminders()
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor   = SyncBlack,
+                        checkedTrackColor   = SyncGreen,
+                        uncheckedThumbColor = SyncLightGray,
+                        uncheckedTrackColor = SyncMidGray
+                    )
+                )
+            }
+
+            if (remindersEnabled) {
+                Text(
+                    text = "Daily reminders active for all 5 reading contexts",
+                    fontSize = 11.sp,
+                    color = SyncLightGray
+                )
+            }
+        }
+
         // ── Danger zone ───────────────────────────────────────
         Column(
             modifier = Modifier
@@ -137,7 +182,7 @@ fun SettingsSection(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(SyncDarkSurface)
-            .border(1.dp, SyncMidGray, RoundedCornerShape(12.dp))
+            .border(1.dp, SyncMagenta, RoundedCornerShape(12.dp))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {

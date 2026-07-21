@@ -34,6 +34,8 @@ fun KetoneScreen(viewModel: MainViewModel) {
     }
     var manualBhb by remember { mutableStateOf("") }
     var manualGlucose by remember { mutableStateOf("") }
+    var manualSystolic by remember { mutableStateOf("") }
+    var manualDiastolic by remember { mutableStateOf("") }
     var showConfirmation by remember { mutableStateOf(false) }
 
     val contexts = listOf(
@@ -104,14 +106,14 @@ fun KetoneScreen(viewModel: MainViewModel) {
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(SyncDarkSurface)
-                    .border(1.dp, SyncMidGray, RoundedCornerShape(12.dp))
+                    .border(1.dp, SyncMagenta, RoundedCornerShape(12.dp))
                     .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "No ketone readings yet\nConnect Keto-Mojo to begin",
                     fontSize = 13.sp,
-                    color = SyncLightGray,
+                    color = SyncMagenta,
                     textAlign = TextAlign.Center
                 )
             }
@@ -123,7 +125,7 @@ fun KetoneScreen(viewModel: MainViewModel) {
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
                 .background(SyncDarkSurface)
-                .border(1.dp, SyncMidGray, RoundedCornerShape(12.dp))
+                .border(1.dp, SyncMagenta, RoundedCornerShape(12.dp))
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -181,7 +183,7 @@ fun KetoneScreen(viewModel: MainViewModel) {
                 singleLine = true
             )
 
-            // Paired glucose entry (fasting only)
+            // Fasting-only fields: paired glucose + manual BP
             if (selectedContext == Constants.CONTEXT_FASTING) {
                 OutlinedTextField(
                     value = manualGlucose,
@@ -203,6 +205,52 @@ fun KetoneScreen(viewModel: MainViewModel) {
                     ),
                     singleLine = true
                 )
+
+                // BP cuff reading
+                Text(
+                    text = "Manual BP cuff reading (fasting, daily)",
+                    fontSize = 11.sp,
+                    color = SyncLightGray
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = manualSystolic,
+                        onValueChange = { manualSystolic = it },
+                        label = {
+                            Text("Systolic", color = SyncLightGray, fontSize = 11.sp)
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor   = SyncGreen,
+                            unfocusedBorderColor = SyncMidGray,
+                            focusedTextColor     = SyncWhite,
+                            unfocusedTextColor   = SyncWhite,
+                            cursorColor          = SyncGreen
+                        ),
+                        singleLine = true,
+                        suffix = { Text("mmHg", color = SyncLightGray, fontSize = 10.sp) }
+                    )
+                    OutlinedTextField(
+                        value = manualDiastolic,
+                        onValueChange = { manualDiastolic = it },
+                        label = {
+                            Text("Diastolic", color = SyncLightGray, fontSize = 11.sp)
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor   = SyncGreen,
+                            unfocusedBorderColor = SyncMidGray,
+                            focusedTextColor     = SyncWhite,
+                            unfocusedTextColor   = SyncWhite,
+                            cursorColor          = SyncGreen
+                        ),
+                        singleLine = true,
+                        suffix = { Text("mmHg", color = SyncLightGray, fontSize = 10.sp) }
+                    )
+                }
             }
 
             Button(
@@ -210,6 +258,9 @@ fun KetoneScreen(viewModel: MainViewModel) {
                     val bhb = manualBhb.toDoubleOrNull()
                     if (bhb != null) {
                         val now = System.currentTimeMillis()
+                        val bpNote = if (selectedContext == Constants.CONTEXT_FASTING &&
+                            manualSystolic.isNotBlank() && manualDiastolic.isNotBlank())
+                            "BP:${manualSystolic}/${manualDiastolic}mmHg" else null
                         viewModel.insertKetoneReading(
                             KetoneReading(
                                 deviceTimestamp     = now,
@@ -218,11 +269,13 @@ fun KetoneScreen(viewModel: MainViewModel) {
                                 glucoseMgDl         = manualGlucose.toIntOrNull(),
                                 source              = "MANUAL",
                                 readingContext      = selectedContext,
-                                notes               = null
+                                notes               = bpNote
                             )
                         )
                         manualBhb = ""
                         manualGlucose = ""
+                        manualSystolic = ""
+                        manualDiastolic = ""
                         showConfirmation = true
                     }
                 },
@@ -260,7 +313,7 @@ fun KetoneScreen(viewModel: MainViewModel) {
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(SyncDarkSurface)
-                    .border(1.dp, SyncMidGray, RoundedCornerShape(12.dp))
+                    .border(1.dp, SyncMagenta, RoundedCornerShape(12.dp))
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {

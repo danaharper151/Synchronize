@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import com.synchronize.app.util.HealthConnectManager
 // import com.synchronize.app.util.DashboardWebSocketServer
 import kotlinx.coroutines.Dispatchers
+import com.synchronize.app.util.ReminderManager
 
 class MainViewModel(private val repository: SynchronizeRepository) : ViewModel() {
 
@@ -205,6 +206,33 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
 
     fun getHealthConnectPermissions() =
         healthConnectManager?.requiredPermissions ?: emptySet()
+
+    // ── Reading reminders ─────────────────────────────────────────
+    private var reminderManager: ReminderManager? = null
+
+    private val _remindersEnabled = MutableStateFlow(false)
+    val remindersEnabled: StateFlow<Boolean> = _remindersEnabled
+
+    fun initReminders(context: android.content.Context) {
+        if (reminderManager == null) {
+            reminderManager = ReminderManager(context)
+            _remindersEnabled.value = reminderManager?.areRemindersScheduled() ?: false
+        }
+    }
+
+    fun enableReminders(context: android.content.Context) {
+        val manager = ReminderManager(context)
+        manager.scheduleAllReminders()
+        reminderManager = manager
+        _remindersEnabled.value = true
+        android.util.Log.d("MainViewModel", "Reading reminders enabled")
+    }
+
+    fun disableReminders() {
+        reminderManager?.cancelAllReminders()
+        _remindersEnabled.value = false
+        android.util.Log.d("MainViewModel", "Reading reminders disabled")
+    }
 
    /* // ── WebSocket dashboard server ────────────────────────────────
     private var wsServer: DashboardWebSocketServer? = null

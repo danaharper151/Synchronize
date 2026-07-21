@@ -70,6 +70,7 @@ fun DashboardScreen(viewModel: MainViewModel) {
     LaunchedEffect(Unit) {
         viewModel.initVoiceInput(context)
         viewModel.initHealthConnect(context)
+        viewModel.initReminders(context)
     }
     LaunchedEffect(Unit) {
 
@@ -133,9 +134,9 @@ fun DashboardScreen(viewModel: MainViewModel) {
             textAlign = TextAlign.Center
         )
         Text(
-            text = "Health Data Collection and Synchronizaton Platform",
+            text = "Unified Wearable Health Dashboard",
             fontSize = 12.sp,
-            color = SyncLightGray,
+            color = SyncMagenta,
             modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.Center
         )
@@ -163,7 +164,7 @@ fun DashboardScreen(viewModel: MainViewModel) {
             )
         }
 
-        // ── Broadcast button- push data to the web dashboard ─────────────────────────────────
+        // ── Broadcast button: push data to the web dashboard ─────────────────────────────────
         if (wsClientCount > 0) {
             Button(
                 onClick = { viewModel.broadcastAllData() },
@@ -242,12 +243,7 @@ fun DashboardScreen(viewModel: MainViewModel) {
         )
         val scope = rememberCoroutineScope()
 
-        DexcomManualCodeEntry(
-            onCodeSubmit = { code ->
-                android.util.Log.d("DexcomAuth", "Code received: ${code.take(8)}")
-                viewModel.setDexcomConnected(true)
-            }
-        )
+
 
         DailyCovariatesCard(
             caffeineMg = caffeineMg,
@@ -339,7 +335,7 @@ fun VoiceLoggingCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(SyncDarkSurface)
-            .border(1.dp, if (isListening) SyncGreen else SyncMidGray, RoundedCornerShape(12.dp))
+            .border(1.dp, if (isListening) SyncGreen else SyncMagenta, RoundedCornerShape(12.dp))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -406,7 +402,7 @@ fun DataQualityCard(dataQuality: Map<String, Int>) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(SyncDarkSurface)
-            .border(1.dp, SyncMidGray, RoundedCornerShape(12.dp))
+            .border(1.dp, SyncMagenta, RoundedCornerShape(12.dp))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -442,7 +438,7 @@ fun StreamStatusCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(SyncDarkSurface)
-            .border(1.dp, SyncMidGray, RoundedCornerShape(12.dp))
+            .border(1.dp, SyncMagenta, RoundedCornerShape(12.dp))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -882,82 +878,7 @@ fun ketoneColor(mmol: Double): Color = when {
 
 
 
-// ── Temporary Dev Tool: Manual Auth Code Entry ────────────────
-// Remove before production deployment
 
-@Composable
-fun DexcomManualCodeEntry(
-    onCodeSubmit: (String) -> Unit
-) {
-    var code by remember { mutableStateOf("") }
-    var expanded by remember { mutableStateOf(false) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(SyncDarkSurface)
-            .border(1.dp, SyncMidGray, RoundedCornerShape(12.dp))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Dev: Manual Auth Code",
-                fontSize = 12.sp,
-                color = SyncLightGray
-            )
-            TextButton(onClick = { expanded = !expanded }) {
-                Text(
-                    text = if (expanded) "Hide" else "Show",
-                    color = SyncLightGray,
-                    fontSize = 11.sp
-                )
-            }
-        }
-
-        if (expanded) {
-            OutlinedTextField(
-                value = code,
-                onValueChange = { code = it },
-                label = {
-                    Text("Paste auth code here", color = SyncLightGray,
-                        fontSize = 11.sp)
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = SyncGreen,
-                    unfocusedBorderColor = SyncMidGray,
-                    focusedTextColor = SyncWhite,
-                    unfocusedTextColor = SyncWhite,
-                    cursorColor = SyncGreen
-                ),
-                singleLine = false,
-                maxLines = 3
-            )
-
-            Button(
-                onClick = {
-                    if (code.isNotBlank()) {
-                        onCodeSubmit(code.trim())
-                        code = ""
-                        expanded = false
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = SyncDarkGray
-                )
-            ) {
-                Text("Submit Code", color = SyncGreen)
-            }
-        }
-    }
-}
 
 @Composable
 fun DailyCovariatesCard(
