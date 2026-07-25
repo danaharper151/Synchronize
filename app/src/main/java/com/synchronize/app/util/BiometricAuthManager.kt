@@ -3,8 +3,6 @@ package com.synchronize.app.util
 import android.content.Context
 import android.util.Log
 import androidx.biometric.BiometricManager
-import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
-import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
@@ -29,17 +27,12 @@ class BiometricAuthManager(private val context: Context) {
 
     fun canAuthenticate(): Boolean {
         val biometricManager = BiometricManager.from(context)
-        return when (biometricManager.canAuthenticate(
-            BIOMETRIC_STRONG or DEVICE_CREDENTIAL
-        )) {
-            BiometricManager.BIOMETRIC_SUCCESS -> true
-            else -> false
-        }
+        return biometricManager.canAuthenticate() == BiometricManager.BIOMETRIC_SUCCESS
     }
 
     fun getAuthenticatorType(): String {
         val biometricManager = BiometricManager.from(context)
-        return when (biometricManager.canAuthenticate(BIOMETRIC_STRONG)) {
+        return when (biometricManager.canAuthenticate()) {
             BiometricManager.BIOMETRIC_SUCCESS -> "Fingerprint / Face ID"
             else -> "PIN / Password"
         }
@@ -60,12 +53,14 @@ class BiometricAuthManager(private val context: Context) {
                 _authState.value = AuthState.Authenticated
             }
 
-            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+            override fun onAuthenticationError(
+                errorCode: Int,
+                errString: CharSequence
+            ) {
                 Log.e(TAG, "Authentication error: $errString ($errorCode)")
                 when (errorCode) {
                     BiometricPrompt.ERROR_USER_CANCELED,
                     BiometricPrompt.ERROR_NEGATIVE_BUTTON -> {
-                        // User cancelled — keep showing the prompt
                         _authState.value = AuthState.Unauthenticated
                     }
                     else -> {
@@ -76,7 +71,6 @@ class BiometricAuthManager(private val context: Context) {
 
             override fun onAuthenticationFailed() {
                 Log.w(TAG, "Authentication failed — wrong biometric")
-                // Don't change state — let the system handle retry
             }
         }
 
@@ -84,7 +78,7 @@ class BiometricAuthManager(private val context: Context) {
             .setTitle("Synchronize")
             .setSubtitle("Research Health Data")
             .setDescription("Authenticate to access your health data")
-            .setAllowedAuthenticators(BIOMETRIC_STRONG or DEVICE_CREDENTIAL)
+            .setDeviceCredentialAllowed(true)
             .build()
 
         val biometricPrompt = BiometricPrompt(activity, executor, callback)

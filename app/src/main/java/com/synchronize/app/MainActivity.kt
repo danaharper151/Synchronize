@@ -14,25 +14,80 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.lifecycleScope
 import com.synchronize.app.data.repository.SynchronizeRepository
 import com.synchronize.app.ui.NavGraph
 import com.synchronize.app.ui.screens.LockScreen
 import com.synchronize.app.ui.theme.SynchronizeTheme
 import com.synchronize.app.ui.viewmodel.MainViewModel
 import com.synchronize.app.util.BiometricAuthManager
+import com.synchronize.app.util.DexcomAuthManager
+import kotlinx.coroutines.launch
+import net.openid.appauth.AuthorizationException
+import net.openid.appauth.AuthorizationResponse
+import net.openid.appauth.AuthorizationService
 
 class MainActivity : FragmentActivity() {
 
+    // ── ViewModel ─────────────────────────────────────────────
     private val viewModel: MainViewModel by viewModels {
         MainViewModel.Factory(
             SynchronizeRepository(SynchronizeApp.instance.database)
         )
     }
 
-    private lateinit var authManager: BiometricAuthManager
+    // ── Auth managers ─────────────────────────────────────────
+    private lateinit var biometricAuthManager: BiometricAuthManager
+    private lateinit var authService: AuthorizationService
+    private lateinit var dexcomAuthManager: DexcomAuthManager
+
+    // ── Dexcom OAuth launcher ─────────────────────────────────
+    private val authLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        android.util.Log.d("DexcomAuth", "Auth result received, resultCode: ${result.resultCode}")
+        val data = result.data
+        android.util.Log.d("DexcomAuth", "Intent data: $data")
+
+        if (data == null) {
+            android.util.Log.e("DexcomAuth", "No intent data returned")
+            return@registerForActivityResult
+        }
+
+        val authResponse = AuthorizationResponse.fromIntent(data)
+        val authException = AuthorizationException.fromIntent(data)
+
+        android.util.Log.d("DexcomAuth", "authResponse: $authResponse")
+        android.util.Log.d("DexcomAuth", "authException: $authException")
+
+        when {
+            authResponse != null -> {
+                android.util.Log.d("DexcomAuth", "Got auth code: ${authResponse.authorizationCode}")
+                lifecycleScope.launch {
+                    val exchangeResult = dexcomAuthManager.exchangeCodeForTokens(
+                        authResponse, authService
+                    )
+                    if (exchangeResult.isSuccess) {
+                        viewModel.setDexcomConnected(true)
+                        android.util.Log.d("DexcomAuth", "Connected successfully!")
+                    } else {
+                        android.util.Log.e("DexcomAuth",
+                            "Token exchange failed: " +
+                                    "${exchangeResult.exceptionOrNull()?.message}")
+                    }
+                }
+            }
+            authException != null -> {
+                android.util.Log.e("DexcomAuth",
+                    "Auth error code: ${authException.code}, message: ${authException.message}")
+            }
+            else -> {
+                android.util.Log.e("DexcomAuth", "Neither authResponse nor authException — user may have cancelled")
+            }
+        }
+    }
 
     // ── Permission launchers ──────────────────────────────────
-
     private val requestMicPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -59,11 +114,15 @@ class MainActivity : FragmentActivity() {
     }
 
     // ── onCreate ──────────────────────────────────────────────
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        authManager = BiometricAuthManager(this)
+
+        // Initialize auth managers
+        biometricAuthManager = BiometricAuthManager(this)
+        authService = AuthorizationService(this)
+        dexcomAuthManager = DexcomAuthManager(this)
+
         requestAllPermissions()
 
         setContent {
@@ -75,27 +134,21 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    // ── App content with auth gate ────────────────────────────
-
+    // ── App content with biometric gate ───────────────────────
     @Composable
     fun AppContent() {
-        val authState by authManager.authState.collectAsState()
         var isAuthenticated by remember { mutableStateOf(false) }
 
         if (!isAuthenticated) {
             LockScreen(
-                authManager = authManager,
-                activity    = this,
-                onAuthenticated = {
-                    isAuthenticated = true
-                }
+                authManager = biometricAuthManager,
+                activity = this,
+                onAuthenticated = { isAuthenticated = true }
             )
-            // Auto-trigger biometric prompt on first launch
             LaunchedEffect(Unit) {
-                if (authManager.canAuthenticate()) {
-                    authManager.authenticate(this@MainActivity)
+                if (biometricAuthManager.canAuthenticate()) {
+                    biometricAuthManager.authenticate(this@MainActivity)
                 } else {
-                    // No biometric available — skip lock screen
                     isAuthenticated = true
                 }
             }
@@ -104,8 +157,13 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    // ── Request all permissions ───────────────────────────────
+    // ── Dexcom auth launch ────────────────────────────────────
+    fun launchDexcomAuth() {
+        val authIntent = dexcomAuthManager.getAuthIntent(authService)
+        authLauncher.launch(authIntent)
+    }
 
+    // ── Permissions ───────────────────────────────────────────
     private fun requestAllPermissions() {
         requestMicrophonePermission()
         requestBlePermissions()
@@ -143,4 +201,10 @@ class MainActivity : FragmentActivity() {
     private fun hasPermission(permission: String): Boolean =
         ContextCompat.checkSelfPermission(this, permission) ==
                 PackageManager.PERMISSION_GRANTED
+
+    // ── Cleanup ───────────────────────────────────────────────
+    override fun onDestroy() {
+        super.onDestroy()
+        authService.dispose()
+    }
 }

@@ -16,7 +16,7 @@ import java.time.format.DateTimeFormatter
 class DexcomSyncManager(
     private val context: Context,
     private val repository: SynchronizeRepository,
-    private val clientSecret: String
+
 ) {
 
     private val authManager = DexcomAuthManager(context)
@@ -49,7 +49,7 @@ class DexcomSyncManager(
 
     suspend fun syncLatestEgvs(): Result<Int> {
         return try {
-            val token = authManager.getValidAccessToken(clientSecret)
+            val token = authManager.getAccessToken()
                 ?: return Result.failure(Exception("Not authenticated"))
 
             // Use last sync time or default to 3 hours ago
@@ -100,7 +100,7 @@ class DexcomSyncManager(
 
     suspend fun syncFullHistory(): Result<Int> {
         return try {
-            val token = authManager.getValidAccessToken(clientSecret)
+            val token = authManager.getAccessToken()
                 ?: return Result.failure(Exception("Not authenticated"))
 
             // Get available data range first

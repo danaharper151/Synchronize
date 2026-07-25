@@ -112,6 +112,7 @@ fun NavGraph(viewModel: MainViewModel) {
                 composable(Screen.Settings.route) {
                     SettingsScreen(viewModel = viewModel)
                 }
+
             }
         }
     }

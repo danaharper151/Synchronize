@@ -24,7 +24,8 @@ interface DexcomApiService {
         @Field("client_secret") clientSecret: String,
         @Field("code")          code: String,
         @Field("grant_type")    grantType: String,
-        @Field("redirect_uri")  redirectUri: String
+        @Field("redirect_uri")  redirectUri: String,
+        @Field("code_verifier") codeVerifier: String?
     ): DexcomTokenResponse
 
     @FormUrlEncoded

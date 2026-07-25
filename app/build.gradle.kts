@@ -15,6 +15,8 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.synchronize.app"
+
     }
 
     buildTypes {
@@ -36,6 +38,8 @@ android {
     buildFeatures {
         compose = true
     }
+
+
 }
 
 dependencies {
@@ -48,6 +52,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation("androidx.navigation:navigation-compose:2.9.0")
     implementation("androidx.browser:browser:1.8.0")
@@ -81,11 +86,13 @@ dependencies {
     implementation("androidx.health.connect:connect-client:1.1.0-rc01")
 
     // ── Security (BiometricPrompt + EncryptedSharedPrefs) ────
-    implementation("androidx.biometric:biometric:1.4.0-alpha02")
+    implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("net.openid:appauth:0.11.1")
 
     // ── DataStore (token storage) ─────────────────────────────
     implementation("androidx.datastore:datastore-preferences:1.1.4")
+
 
     // ── JSON parsing ──────────────────────────────────────────
     implementation("com.google.code.gson:gson:2.13.1")
@@ -98,6 +105,6 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
 
     // Web Dashboard
-    // implementation("org.java-websocket:Java-WebSocket:1.5.7")
+     implementation("org.java-websocket:Java-WebSocket:1.5.7")
 
 }

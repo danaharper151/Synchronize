@@ -3,7 +3,7 @@ package com.synchronize.app.util
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.browser.customtabs.CustomTabsIntent
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -13,6 +13,17 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import net.openid.appauth.AuthorizationRequest
+import net.openid.appauth.AuthorizationServiceConfiguration
+import net.openid.appauth.ClientAuthentication
+import net.openid.appauth.ClientSecretPost
+import net.openid.appauth.GrantTypeValues
+import net.openid.appauth.ResponseTypeValues
+import net.openid.appauth.TokenRequest
+import net.openid.appauth.AuthorizationService
+import net.openid.appauth.AuthorizationResponse
+import net.openid.appauth.AuthorizationException
+import kotlin.coroutines.resumeWithException
 
 // ── DataStore extension ───────────────────────────────────────
 
@@ -33,91 +44,153 @@ object DexcomPrefKeys {
 
 class DexcomAuthManager(private val context: Context) {
 
-    private val api = DexcomRetrofitClient.instance
+    private val TAG = "DexcomAuthManager"
 
-    // ── Launch OAuth login in Chrome Custom Tab ────────────────
+    // ── AppAuth service configuration ─────────────────────────
 
-    fun launchAuthFlow() {
-        val authUri = Uri.parse(Constants.DEXCOM_AUTH_URL)
-        val customTabsIntent = CustomTabsIntent.Builder().build()
-        customTabsIntent.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        customTabsIntent.launchUrl(context, authUri)
+    private val serviceConfig = AuthorizationServiceConfiguration(
+        Uri.parse("${Constants.DEXCOM_BASE_URL}v2/oauth2/login"),
+        Uri.parse("${Constants.DEXCOM_BASE_URL}v2/oauth2/token")
+    )
+
+    // ── Build authorization request ───────────────────────────
+
+    fun buildAuthRequest(): AuthorizationRequest {
+        return AuthorizationRequest.Builder(
+            serviceConfig,
+            Constants.DEXCOM_CLIENT_ID,
+            ResponseTypeValues.CODE,
+            Uri.parse(Constants.DEXCOM_REDIRECT_URI)
+        )
+            .setScope(Constants.DEXCOM_SCOPE)
+            .build()
     }
 
-    // ── Exchange auth code for tokens ─────────────────────────
+    // ── Get auth intent to launch Chrome Custom Tab ───────────
+
+    fun getAuthIntent(authService: AuthorizationService): Intent {
+        val authRequest = buildAuthRequest()
+        return authService.getAuthorizationRequestIntent(authRequest)
+    }
+
+    // ── Exchange auth response for tokens ─────────────────────
 
     suspend fun exchangeCodeForTokens(
-        code: String,
-        clientSecret: String
-    ): Result<DexcomTokenResponse> {
+        authResponse: AuthorizationResponse,
+        authService: AuthorizationService
+    ): Result<Unit> {
         return try {
-            val response = api.getToken(
-                clientId    = Constants.DEXCOM_CLIENT_ID,
-                clientSecret = clientSecret,
-                code        = code,
-                grantType   = "authorization_code",
-                redirectUri = Constants.DEXCOM_REDIRECT_URI
+            val code = authResponse.authorizationCode
+                ?: return Result.failure(Exception("No authorization code in response"))
+
+            Log.d(TAG, "Exchanging code via Retrofit...")
+
+            val api = DexcomRetrofitClient.instance
+            val tokenResponse = api.getToken(
+                clientId     = Constants.DEXCOM_CLIENT_ID,
+                clientSecret = Constants.DEXCOM_CLIENT_SECRET,
+                code         = code,
+                grantType    = "authorization_code",
+                redirectUri  = Constants.DEXCOM_REDIRECT_URI,
+                codeVerifier = authResponse.request.codeVerifier
             )
-            saveTokens(response)
-            Result.success(response)
+
+            context.dexcomDataStore.edit { prefs ->
+                prefs[DexcomPrefKeys.ACCESS_TOKEN]  = tokenResponse.accessToken
+                prefs[DexcomPrefKeys.REFRESH_TOKEN] = tokenResponse.refreshToken
+                prefs[DexcomPrefKeys.TOKEN_EXPIRY]  =
+                    System.currentTimeMillis() + (tokenResponse.expiresIn * 1000L)
+            }
+
+            Log.d(TAG, "Token exchange successful — access token stored")
+            Result.success(Unit)
+
+        } catch (e: retrofit2.HttpException) {
+            val errorBody = e.response()?.errorBody()?.string()
+            Log.e(TAG, "HTTP ${e.code()} — $errorBody")
+            Result.failure(Exception("HTTP ${e.code()}: $errorBody"))
         } catch (e: Exception) {
+            Log.e(TAG, "Token exchange failed", e)
             Result.failure(e)
         }
     }
-
     // ── Refresh access token ──────────────────────────────────
 
-    suspend fun refreshAccessToken(clientSecret: String): Result<DexcomTokenResponse> {
+    suspend fun refreshAccessToken(
+        authService: AuthorizationService
+    ): Result<Unit> {
         return try {
-            val storedRefreshToken = getRefreshToken() ?: return Result.failure(
-                Exception("No refresh token stored")
+            val refreshToken = getRefreshToken()
+                ?: return Result.failure(Exception("No refresh token stored"))
+
+            val clientAuth: ClientAuthentication = ClientSecretPost(
+                Constants.DEXCOM_CLIENT_SECRET
             )
-            val response = api.refreshToken(
-                clientId     = Constants.DEXCOM_CLIENT_ID,
-                clientSecret = clientSecret,
-                refreshToken = storedRefreshToken,
-                redirectUri  = Constants.DEXCOM_REDIRECT_URI
+
+            val tokenRequest = TokenRequest.Builder(
+                serviceConfig,
+                Constants.DEXCOM_CLIENT_ID
             )
-            saveTokens(response)
-            Result.success(response)
+                .setGrantType(GrantTypeValues.REFRESH_TOKEN)
+                .setRefreshToken(refreshToken)
+                .setRedirectUri(Uri.parse(Constants.DEXCOM_REDIRECT_URI))
+                .build()
+
+            val tokenResponse = kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+                authService.performTokenRequest(tokenRequest, clientAuth) { response, ex ->
+                    if (response != null) {
+                        cont.resume(response) {}
+                    } else {
+                        cont.resumeWithException(
+                            ex ?: Exception("Token refresh failed")
+                        )
+                    }
+                }
+            }
+
+            context.dexcomDataStore.edit { prefs ->
+                prefs[DexcomPrefKeys.ACCESS_TOKEN]  = tokenResponse.accessToken ?: ""
+                prefs[DexcomPrefKeys.REFRESH_TOKEN] = tokenResponse.refreshToken
+                    ?: refreshToken
+                prefs[DexcomPrefKeys.TOKEN_EXPIRY]  = tokenResponse.accessTokenExpirationTime
+                    ?: (System.currentTimeMillis() + 3600000L)
+            }
+
+            Log.d(TAG, "Token refresh successful")
+            Result.success(Unit)
+
         } catch (e: Exception) {
+            Log.e(TAG, "Token refresh failed", e)
             Result.failure(e)
         }
     }
 
-    // ── Get valid access token (refreshes if expired) ─────────
+    // ── Get valid access token ────────────────────────────────
 
-    suspend fun getValidAccessToken(clientSecret: String): String? {
+    suspend fun getValidAccessToken(
+        authService: AuthorizationService
+    ): String? {
         val expiry = getTokenExpiry()
         val now = System.currentTimeMillis()
         return if (expiry != null && now < expiry - 60_000) {
-            // Token still valid — return it
             getAccessToken()
         } else {
-            // Token expired or expiring soon — refresh
-            val result = refreshAccessToken(clientSecret)
+            val result = refreshAccessToken(authService)
             if (result.isSuccess) getAccessToken() else null
         }
     }
 
-    // ── Save tokens to DataStore ──────────────────────────────
-
-    private suspend fun saveTokens(response: DexcomTokenResponse) {
-        context.dexcomDataStore.edit { prefs ->
-            prefs[DexcomPrefKeys.ACCESS_TOKEN]  = response.accessToken
-            prefs[DexcomPrefKeys.REFRESH_TOKEN] = response.refreshToken
-            prefs[DexcomPrefKeys.TOKEN_EXPIRY]  = System.currentTimeMillis() +
-                    (response.expiresIn * 1000L)
-        }
-    }
-
-    // ── Read tokens from DataStore ────────────────────────────
+    // ── DataStore accessors ───────────────────────────────────
 
     suspend fun getAccessToken(): String? =
-        context.dexcomDataStore.data.map { it[DexcomPrefKeys.ACCESS_TOKEN] }.first()
+        context.dexcomDataStore.data.map {
+            it[DexcomPrefKeys.ACCESS_TOKEN]?.ifBlank { null }
+        }.first()
 
     suspend fun getRefreshToken(): String? =
-        context.dexcomDataStore.data.map { it[DexcomPrefKeys.REFRESH_TOKEN] }.first()
+        context.dexcomDataStore.data.map {
+            it[DexcomPrefKeys.REFRESH_TOKEN]?.ifBlank { null }
+        }.first()
 
     private suspend fun getTokenExpiry(): Long? =
         context.dexcomDataStore.data.map { it[DexcomPrefKeys.TOKEN_EXPIRY] }.first()
@@ -131,12 +204,12 @@ class DexcomAuthManager(private val context: Context) {
         }
     }
 
-    // ── Auth state ────────────────────────────────────────────
-
     suspend fun isAuthenticated(): Boolean = getAccessToken() != null
 
     val isAuthenticatedFlow: Flow<Boolean> =
-        context.dexcomDataStore.data.map { it[DexcomPrefKeys.ACCESS_TOKEN] != null }
+        context.dexcomDataStore.data.map {
+            !it[DexcomPrefKeys.ACCESS_TOKEN].isNullOrBlank()
+        }
 
     suspend fun clearTokens() {
         context.dexcomDataStore.edit { it.clear() }

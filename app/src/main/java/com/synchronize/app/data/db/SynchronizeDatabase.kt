@@ -14,6 +14,7 @@ import com.synchronize.app.data.db.entity.GlucoseReading
 import com.synchronize.app.data.db.entity.KetoneReading
 import com.synchronize.app.data.db.entity.MealEntry
 import com.synchronize.app.data.db.entity.SleepSession
+import net.sqlcipher.database.SupportFactory
 
 @Database(
     entities = [
@@ -41,8 +42,6 @@ abstract class SynchronizeDatabase : RoomDatabase() {
 
         fun getInstance(context: Context, passphrase: ByteArray): SynchronizeDatabase {
             return INSTANCE ?: synchronized(this) {
-                // NOTE: SQLCipher encryption disabled for emulator development
-                // Re-enable with SupportFactory when testing on real A36 device
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     SynchronizeDatabase::class.java,

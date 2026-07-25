@@ -18,6 +18,16 @@ import androidx.compose.ui.unit.sp
 import com.synchronize.app.ui.theme.*
 import com.synchronize.app.ui.viewmodel.MainViewModel
 import com.synchronize.app.util.Constants
+import com.synchronize.app.util.DexcomAuthManager
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+
 
 @Composable
 fun SettingsScreen(viewModel: MainViewModel) {
@@ -39,6 +49,8 @@ fun SettingsScreen(viewModel: MainViewModel) {
             modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.Center
         )
+
+
 
         // ── Study configuration ───────────────────────────────
         SettingsSection(title = "Study Configuration") {

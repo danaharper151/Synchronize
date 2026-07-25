@@ -1,5 +1,6 @@
 package com.synchronize.app.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -9,71 +10,65 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.synchronize.app.data.db.entity.GlucoseReading
 import com.synchronize.app.data.db.entity.KetoneReading
-import com.synchronize.app.data.db.entity.BiosignalSample
+import com.synchronize.app.data.db.entity.MealEntry
 import com.synchronize.app.ui.theme.*
 import com.synchronize.app.ui.viewmodel.MainViewModel
-import androidx.compose.ui.platform.LocalContext
-import com.synchronize.app.util.DexcomAuthManager
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
-import android.util.Log
-import androidx.compose.runtime.LaunchedEffect
-import java.time.Instant
-import com.synchronize.app.data.db.entity.MealEntry
-import com.synchronize.app.util.VoiceInputManager
-import com.synchronize.app.util.KetoMojoManager
+
 import com.synchronize.app.util.HealthConnectManager
+import com.synchronize.app.util.KetoMojoManager
+import com.synchronize.app.util.VoiceInputManager
+import java.time.Instant
+import kotlinx.coroutines.launch
+import com.synchronize.app.MainActivity
 
 @Composable
 fun DashboardScreen(viewModel: MainViewModel) {
 
-    val latestGlucose by viewModel.latestGlucose.collectAsState()
-    val latestKetone by viewModel.latestKetone.collectAsState()
-    val latestBiosignal by viewModel.latestBiosignal.collectAsState()
-    val dataQuality by viewModel.dataQuality.collectAsState()
-    val isListening by viewModel.isListening.collectAsState()
-    val voiceTranscription by viewModel.voiceTranscription.collectAsState()
-    val pendingMeal by viewModel.pendingMealEntry.collectAsState()
-    val isDexcomConnected by viewModel.isDexcomConnected.collectAsState()
-    val glucoseSyncCount by viewModel.glucoseSyncCount.collectAsState()
-    val bleState by viewModel.bleState.collectAsState()
-    val latestKetoneReading by viewModel.latestKetoneReading.collectAsState()
-    val hcState by viewModel.hcState.collectAsState()
-    val lastBiosignalSync by viewModel.lastBiosignalSync.collectAsState()
-    val caffeineMg by viewModel.caffeineMg.collectAsState()
-    val meditationAm by viewModel.meditationAmMinutes.collectAsState()
-    val meditationPm by viewModel.meditationPmMinutes.collectAsState()
-    val covariatesLogged by viewModel.covariatesLoggedToday.collectAsState()
-    // val wsClientCount by viewModel.wsClientCount.collectAsState()
     val context = LocalContext.current
-    // Observe voice input state
+
+    // ── State collectors ──────────────────────────────────────
+    val latestGlucose     by viewModel.latestGlucose.collectAsState()
+    val latestKetone      by viewModel.latestKetone.collectAsState()
+    val latestBiosignal   by viewModel.latestBiosignal.collectAsState()
+    val dataQuality       by viewModel.dataQuality.collectAsState()
+    val isListening       by viewModel.isListening.collectAsState()
+    val voiceTranscription by viewModel.voiceTranscription.collectAsState()
+    val pendingMeal       by viewModel.pendingMealEntry.collectAsState()
+    val isDexcomConnected by viewModel.isDexcomConnected.collectAsState()
+    val glucoseSyncCount  by viewModel.glucoseSyncCount.collectAsState()
+    val bleState          by viewModel.bleState.collectAsState()
+    val latestKetoneReading by viewModel.latestKetoneReading.collectAsState()
+    val hcState           by viewModel.hcState.collectAsState()
+    val lastBiosignalSync by viewModel.lastBiosignalSync.collectAsState()
+    val caffeineMg        by viewModel.caffeineMg.collectAsState()
+    val meditationAm      by viewModel.meditationAmMinutes.collectAsState()
+    val meditationPm      by viewModel.meditationPmMinutes.collectAsState()
+    val covariatesLogged  by viewModel.covariatesLoggedToday.collectAsState()
+    val activity = context as MainActivity
+
+
+
+    // ── Init effects ──────────────────────────────────────────
     LaunchedEffect(Unit) {
         viewModel.initVoiceInput(context)
         viewModel.initHealthConnect(context)
         viewModel.initReminders(context)
     }
-    LaunchedEffect(Unit) {
 
+    LaunchedEffect(Unit) {
         viewModel.voiceState.collect { voiceState ->
             when (voiceState) {
                 is VoiceInputManager.VoiceState.Result -> {
@@ -113,7 +108,10 @@ fun DashboardScreen(viewModel: MainViewModel) {
             }
         }
     }
-    val scope = rememberCoroutineScope()
+
+
+
+    // ── Main dashboard ────────────────────────────────────────
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -134,48 +132,16 @@ fun DashboardScreen(viewModel: MainViewModel) {
             textAlign = TextAlign.Center
         )
         Text(
-            text = "Unified Wearable Health Dashboard",
+            text = "Ketone Prediction Research Dashboard",
             fontSize = 12.sp,
-            color = SyncMagenta,
+            color = SyncLightGray,
             modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.Center
         )
-        /*Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(
-                        if (wsClientCount > 0) SyncGreen else SyncMidGray,
-                        shape = RoundedCornerShape(4.dp)
-                    )
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = if (wsClientCount > 0)
-                    "Web dashboard connected ($wsClientCount client)"
-                else
-                    "Web dashboard: waiting on port 8080",
-                fontSize = 10.sp,
-                color = if (wsClientCount > 0) SyncGreen else SyncLightGray
-            )
-        }
 
-        // ── Broadcast button: push data to the web dashboard ─────────────────────────────────
-        if (wsClientCount > 0) {
-            Button(
-                onClick = { viewModel.broadcastAllData() },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = SyncDarkGray)
-            ) {
-                Text("Broadcast to Web Dashboard", color = SyncGreen, fontSize = 12.sp)
-            }
-        }*/
+        Spacer(modifier = Modifier.height(4.dp))
 
-        // ── Summary cards row ─────────────────────────────────
+        // ── Summary cards ─────────────────────────────────────
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -185,15 +151,18 @@ fun DashboardScreen(viewModel: MainViewModel) {
                 label = "Glucose",
                 value = latestGlucose?.glucoseMgDl?.toString() ?: "--",
                 unit = "mg/dL",
-                valueColor = latestGlucose?.let { glucoseColor(it.glucoseMgDl) } ?: SyncLightGray,
+                valueColor = latestGlucose?.let { glucoseColor(it.glucoseMgDl) }
+                    ?: SyncLightGray,
                 subtitle = latestGlucose?.trend ?: "No data"
             )
             SummaryCard(
                 modifier = Modifier.weight(1f),
                 label = "Ketones",
-                value = latestKetone?.betaHydroxybutyrate?.let { "%.1f".format(it) } ?: "--",
+                value = latestKetone?.betaHydroxybutyrate
+                    ?.let { "%.1f".format(it) } ?: "--",
                 unit = "mmol/L",
-                valueColor = latestKetone?.let { ketoneColor(it.betaHydroxybutyrate) } ?: SyncLightGray,
+                valueColor = latestKetone?.let { ketoneColor(it.betaHydroxybutyrate) }
+                    ?: SyncLightGray,
                 subtitle = latestKetone?.readingContext ?: "No data"
             )
             SummaryCard(
@@ -202,7 +171,9 @@ fun DashboardScreen(viewModel: MainViewModel) {
                 value = latestBiosignal?.heartRateBpm?.toString() ?: "--",
                 unit = "bpm",
                 valueColor = SyncGreen,
-                subtitle = latestBiosignal?.let { "HRV ${it.hrvRmssd?.let { r -> "%.0f".format(r) } ?: "--"} ms" } ?: "No data"
+                subtitle = latestBiosignal?.let {
+                    "HRV ${it.hrvRmssd?.let { r -> "%.0f".format(r) } ?: "--"} ms"
+                } ?: "No data"
             )
         }
 
@@ -211,7 +182,9 @@ fun DashboardScreen(viewModel: MainViewModel) {
             isListening = isListening,
             transcription = voiceTranscription,
             pendingMeal = pendingMeal?.let {
-                "Cal:${it.calories} | F:${it.fatGrams}g | P:${it.proteinGrams}g | NC:${it.netCarbGrams}g | Fib:${it.fiberGrams}g"
+                "Cal:${it.calories} | F:${it.fatGrams.toInt()}g | " +
+                        "P:${it.proteinGrams.toInt()}g | NC:${it.netCarbGrams.toInt()}g | " +
+                        "Fib:${it.fiberGrams.toInt()}g"
             },
             onMicClick = {
                 if (isListening) {
@@ -228,23 +201,7 @@ fun DashboardScreen(viewModel: MainViewModel) {
             onDiscard = { viewModel.discardPendingMealEntry() }
         )
 
-        // ── Data quality card ─────────────────────────────────
-        if (dataQuality.isNotEmpty()) {
-            DataQualityCard(dataQuality = dataQuality)
-        }
-
-        DexcomConnectCard(
-            isConnected = isDexcomConnected,
-            glucoseCount = glucoseSyncCount,
-            onConnectClick = {
-                DexcomAuthManager(context).launchAuthFlow()
-            },
-            onSyncClick = { viewModel.refreshLatestReadings() }
-        )
-        val scope = rememberCoroutineScope()
-
-
-
+        // ── Daily covariates card ─────────────────────────────
         DailyCovariatesCard(
             caffeineMg = caffeineMg,
             meditationAm = meditationAm,
@@ -256,6 +213,20 @@ fun DashboardScreen(viewModel: MainViewModel) {
             onReset = { viewModel.resetDailyCovariates() }
         )
 
+        // ── Data quality card ─────────────────────────────────
+        if (dataQuality.isNotEmpty()) {
+            DataQualityCard(dataQuality = dataQuality)
+        }
+
+        // ── Dexcom connect card ───────────────────────────────
+        DexcomConnectCard(
+            isConnected = isDexcomConnected,
+            glucoseCount = glucoseSyncCount,
+            onConnectClick = { activity.launchDexcomAuth() },
+            onSyncClick = { viewModel.refreshLatestReadings() }
+        )
+
+        // ── Keto-Mojo card ────────────────────────────────────
         KetoMojoCard(
             bleState = bleState,
             latestReading = latestKetoneReading,
@@ -265,6 +236,8 @@ fun DashboardScreen(viewModel: MainViewModel) {
             },
             onDisconnectClick = { viewModel.disconnectKetoMojo() }
         )
+
+        // ── Health Connect / Galaxy Watch card ────────────────
         HealthConnectCard(
             hcState = hcState,
             lastSyncTime = lastBiosignalSync,
@@ -280,8 +253,7 @@ fun DashboardScreen(viewModel: MainViewModel) {
             }
         )
 
-
-        // ── Status indicators ─────────────────────────────────
+        // ── Stream status card ────────────────────────────────
         StreamStatusCard(
             glucoseCount = dataQuality["glucose"] ?: 0,
             ketoneCount = dataQuality["ketones"] ?: 0,
@@ -307,7 +279,7 @@ fun SummaryCard(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
             .background(SyncDarkSurface)
-            .border(1.dp, SyncMidGray, RoundedCornerShape(12.dp))
+            .border(1.dp, SyncMagenta, RoundedCornerShape(12.dp))
             .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -315,7 +287,8 @@ fun SummaryCard(
         Text(text = label, fontSize = 11.sp, color = SyncLightGray)
         Text(text = value, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = valueColor)
         Text(text = unit, fontSize = 10.sp, color = SyncLightGray)
-        Text(text = subtitle, fontSize = 9.sp, color = SyncLightGray, textAlign = TextAlign.Center)
+        Text(text = subtitle, fontSize = 9.sp, color = SyncLightGray,
+            textAlign = TextAlign.Center)
     }
 }
 
@@ -335,17 +308,25 @@ fun VoiceLoggingCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(SyncDarkSurface)
-            .border(1.dp, if (isListening) SyncGreen else SyncMagenta, RoundedCornerShape(12.dp))
+            .border(
+                1.dp,
+                if (isListening) SyncGreen else SyncMagenta,
+                RoundedCornerShape(12.dp)
+            )
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(text = "Voice Macro Entry", fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold, color = SyncGreen)
+        Text(
+            text = "Voice Macro Entry",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = SyncGreen
+        )
         Text(
             text = "Format: calories / fat / protein / net carbs / fiber",
-            fontSize = 11.sp, color = SyncLightGray
+            fontSize = 11.sp,
+            color = SyncLightGray
         )
-
         Button(
             onClick = onMicClick,
             colors = ButtonDefaults.buttonColors(
@@ -364,11 +345,9 @@ fun VoiceLoggingCard(
                 color = if (isListening) SyncBlack else SyncGreen
             )
         }
-
         transcription?.let {
             Text(text = it, fontSize = 12.sp, color = SyncWhite)
         }
-
         pendingMeal?.let {
             Text(text = "Parsed: $it", fontSize = 12.sp, color = SyncGreen)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -383,7 +362,7 @@ fun VoiceLoggingCard(
                     onClick = onDiscard,
                     modifier = Modifier.weight(1f),
                     border = ButtonDefaults.outlinedButtonBorder.copy(
-                        brush = androidx.compose.ui.graphics.SolidColor(SyncMagenta)
+                        brush = SolidColor(SyncMagenta)
                     )
                 ) {
                     Text("Discard", color = SyncMagenta)
@@ -406,16 +385,24 @@ fun DataQualityCard(dataQuality: Map<String, Int>) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(text = "Data Collection", fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold, color = SyncGreen)
+        Text(
+            text = "Data Collection",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = SyncGreen
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             dataQuality.forEach { (key, count) ->
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = count.toString(), fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold, color = SyncGreen)
+                    Text(
+                        text = count.toString(),
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = SyncGreen
+                    )
                     Text(text = key, fontSize = 10.sp, color = SyncLightGray)
                 }
             }
@@ -442,8 +429,12 @@ fun StreamStatusCard(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text(text = "Stream Status", fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold, color = SyncGreen)
+        Text(
+            text = "Stream Status",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = SyncGreen
+        )
         StreamStatusRow("CGM (Dexcom G7)", glucoseCount, "readings")
         StreamStatusRow("Blood Ketones (Keto-Mojo)", ketoneCount, "readings")
         StreamStatusRow("Biosignals (Galaxy Watch)", biosignalCount, "samples")
@@ -460,8 +451,10 @@ fun StreamStatusRow(label: String, count: Int, unit: String) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(text = label, fontSize = 12.sp, color = SyncWhite)
-        Row(verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
             Box(
                 modifier = Modifier
                     .size(8.dp)
@@ -479,9 +472,190 @@ fun StreamStatusRow(label: String, count: Int, unit: String) {
     }
 }
 
+// ── Daily Covariates Card ─────────────────────────────────────
+
+@Composable
+fun DailyCovariatesCard(
+    caffeineMg: Double,
+    meditationAm: Int,
+    meditationPm: Int,
+    isLogged: Boolean,
+    onLog: (caffeine: Double, am: Int, pm: Int) -> Unit,
+    onReset: () -> Unit
+) {
+    var caffeineInput by remember { mutableStateOf(caffeineMg.toInt().toString()) }
+    var amInput by remember {
+        mutableStateOf(if (meditationAm > 0) meditationAm.toString() else "")
+    }
+    var pmInput by remember {
+        mutableStateOf(if (meditationPm > 0) meditationPm.toString() else "")
+    }
+    var expanded by remember { mutableStateOf(!isLogged) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(SyncDarkSurface)
+            .border(
+                1.dp,
+                if (isLogged) SyncGreen else SyncMagenta,
+                RoundedCornerShape(12.dp)
+            )
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Daily Covariates",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isLogged) SyncGreen else SyncWhite
+                )
+                Text(
+                    text = if (isLogged)
+                        "Logged ✓ — caffeine ${caffeineMg.toInt()}mg · " +
+                                "AM ${meditationAm}min · PM ${meditationPm}min"
+                    else "Log today's caffeine and meditation",
+                    fontSize = 11.sp,
+                    color = SyncLightGray
+                )
+            }
+            TextButton(onClick = { expanded = !expanded }) {
+                Text(
+                    text = if (expanded) "Hide" else "Edit",
+                    color = if (isLogged) SyncLightGray else SyncMagenta,
+                    fontSize = 11.sp
+                )
+            }
+        }
+
+        if (expanded) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Caffeine (mg)", fontSize = 11.sp, color = SyncLightGray)
+                    Text("46g grounds ≈ 400mg (~5 cups)",
+                        fontSize = 9.sp, color = SyncMidGray)
+                }
+                OutlinedTextField(
+                    value = caffeineInput,
+                    onValueChange = { caffeineInput = it },
+                    modifier = Modifier.width(100.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = SyncGreen,
+                        unfocusedBorderColor = SyncMidGray,
+                        focusedTextColor     = SyncWhite,
+                        unfocusedTextColor   = SyncWhite,
+                        cursorColor          = SyncGreen
+                    ),
+                    singleLine = true,
+                    suffix = { Text("mg", color = SyncLightGray, fontSize = 11.sp) }
+                )
+            }
+
+            HorizontalDivider(color = SyncMidGray, thickness = 0.5.dp)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Meditation AM", fontSize = 11.sp, color = SyncLightGray)
+                    Text("Morning session duration",
+                        fontSize = 9.sp, color = SyncMidGray)
+                }
+                OutlinedTextField(
+                    value = amInput,
+                    onValueChange = { amInput = it },
+                    modifier = Modifier.width(100.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = SyncGreen,
+                        unfocusedBorderColor = SyncMidGray,
+                        focusedTextColor     = SyncWhite,
+                        unfocusedTextColor   = SyncWhite,
+                        cursorColor          = SyncGreen
+                    ),
+                    singleLine = true,
+                    suffix = { Text("min", color = SyncLightGray, fontSize = 11.sp) }
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Meditation PM", fontSize = 11.sp, color = SyncLightGray)
+                    Text("Evening session duration",
+                        fontSize = 9.sp, color = SyncMidGray)
+                }
+                OutlinedTextField(
+                    value = pmInput,
+                    onValueChange = { pmInput = it },
+                    modifier = Modifier.width(100.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = SyncGreen,
+                        unfocusedBorderColor = SyncMidGray,
+                        focusedTextColor     = SyncWhite,
+                        unfocusedTextColor   = SyncWhite,
+                        cursorColor          = SyncGreen
+                    ),
+                    singleLine = true,
+                    suffix = { Text("min", color = SyncLightGray, fontSize = 11.sp) }
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = {
+                        val caffeine = caffeineInput.toDoubleOrNull() ?: 400.0
+                        val am = amInput.toIntOrNull() ?: 0
+                        val pm = pmInput.toIntOrNull() ?: 0
+                        onLog(caffeine, am, pm)
+                        expanded = false
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = SyncGreen)
+                ) {
+                    Text("Log Today", color = SyncBlack, fontWeight = FontWeight.Bold)
+                }
+                if (isLogged) {
+                    OutlinedButton(
+                        onClick = {
+                            onReset()
+                            caffeineInput = "400"
+                            amInput = ""
+                            pmInput = ""
+                            expanded = true
+                        },
+                        modifier = Modifier.weight(1f),
+                        border = ButtonDefaults.outlinedButtonBorder.copy(
+                            brush = SolidColor(SyncLightGray)
+                        )
+                    ) {
+                        Text("Reset", color = SyncLightGray)
+                    }
+                }
+            }
+        }
+    }
+}
 
 // ── Dexcom Connect Card ───────────────────────────────────────
-
 
 @Composable
 fun DexcomConnectCard(
@@ -516,10 +690,8 @@ fun DexcomConnectCard(
                     color = if (isConnected) SyncGreen else SyncWhite
                 )
                 Text(
-                    text = if (isConnected)
-                        "$glucoseCount readings synced"
-                    else
-                        "Not connected",
+                    text = if (isConnected) "$glucoseCount readings synced"
+                    else "Not connected",
                     fontSize = 11.sp,
                     color = SyncLightGray
                 )
@@ -538,9 +710,7 @@ fun DexcomConnectCard(
             Button(
                 onClick = onConnectClick,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = SyncMagenta
-                )
+                colors = ButtonDefaults.buttonColors(containerColor = SyncMagenta)
             ) {
                 Text(
                     text = "Connect Dexcom G7",
@@ -557,7 +727,7 @@ fun DexcomConnectCard(
                     onClick = onSyncClick,
                     modifier = Modifier.weight(1f),
                     border = ButtonDefaults.outlinedButtonBorder.copy(
-                        brush = androidx.compose.ui.graphics.SolidColor(SyncGreen)
+                        brush = SolidColor(SyncGreen)
                     )
                 ) {
                     Text("Sync Now", color = SyncGreen)
@@ -566,7 +736,7 @@ fun DexcomConnectCard(
                     onClick = onConnectClick,
                     modifier = Modifier.weight(1f),
                     border = ButtonDefaults.outlinedButtonBorder.copy(
-                        brush = androidx.compose.ui.graphics.SolidColor(SyncLightGray)
+                        brush = SolidColor(SyncLightGray)
                     )
                 ) {
                     Text("Reconnect", color = SyncLightGray)
@@ -575,6 +745,9 @@ fun DexcomConnectCard(
         }
     }
 }
+
+// ── Keto-Mojo Card ────────────────────────────────────────────
+
 @Composable
 fun KetoMojoCard(
     bleState: KetoMojoManager.BleState,
@@ -597,7 +770,7 @@ fun KetoMojoCard(
                 when {
                     isConnected -> SyncGreen
                     isScanning || isConnecting -> SyncMagenta
-                    else -> SyncMidGray
+                    else -> SyncMagenta
                 },
                 RoundedCornerShape(12.dp)
             )
@@ -618,14 +791,14 @@ fun KetoMojoCard(
                 )
                 Text(
                     text = when (bleState) {
-                        is KetoMojoManager.BleState.Idle        -> "Not connected"
-                        is KetoMojoManager.BleState.Scanning    -> "Scanning..."
+                        is KetoMojoManager.BleState.Idle -> "Not connected"
+                        is KetoMojoManager.BleState.Scanning -> "Scanning..."
                         is KetoMojoManager.BleState.DeviceFound -> "Device found"
-                        is KetoMojoManager.BleState.Connecting  -> "Connecting..."
-                        is KetoMojoManager.BleState.Connected   -> "Connected"
+                        is KetoMojoManager.BleState.Connecting -> "Connecting..."
+                        is KetoMojoManager.BleState.Connected -> "Connected"
                         is KetoMojoManager.BleState.ReadingReceived -> "Reading received"
                         is KetoMojoManager.BleState.Disconnected -> "Disconnected"
-                        is KetoMojoManager.BleState.Error       -> bleState.message
+                        is KetoMojoManager.BleState.Error -> bleState.message
                     },
                     fontSize = 11.sp,
                     color = SyncLightGray
@@ -635,17 +808,12 @@ fun KetoMojoCard(
                 modifier = Modifier
                     .size(12.dp)
                     .background(
-                        when {
-                            isConnected -> SyncGreen
-                            isScanning || isConnecting -> SyncMagenta
-                            else -> SyncMidGray
-                        },
+                        if (isConnected) SyncGreen else SyncMagenta,
                         shape = RoundedCornerShape(6.dp)
                     )
             )
         }
 
-        // Latest reading display
         latestReading?.let { reading ->
             Row(
                 modifier = Modifier
@@ -678,7 +846,6 @@ fun KetoMojoCard(
             }
         }
 
-        // Action buttons
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -694,22 +861,21 @@ fun KetoMojoCard(
             ) {
                 Text(
                     text = when {
-                        isScanning   -> "Scanning..."
+                        isScanning -> "Scanning..."
                         isConnecting -> "Connecting..."
-                        isConnected  -> "Scan Again"
-                        else         -> "Connect Meter"
+                        isConnected -> "Scan Again"
+                        else -> "Connect Meter"
                     },
                     color = if (isConnected) SyncLightGray else SyncBlack,
                     fontWeight = FontWeight.Bold
                 )
             }
-
             if (isConnected) {
                 OutlinedButton(
                     onClick = onDisconnectClick,
                     modifier = Modifier.weight(1f),
                     border = ButtonDefaults.outlinedButtonBorder.copy(
-                        brush = androidx.compose.ui.graphics.SolidColor(SyncLightGray)
+                        brush = SolidColor(SyncLightGray)
                     )
                 ) {
                     Text("Disconnect", color = SyncLightGray)
@@ -718,6 +884,9 @@ fun KetoMojoCard(
         }
     }
 }
+
+// ── Health Connect Card ───────────────────────────────────────
+
 @Composable
 fun HealthConnectCard(
     hcState: HealthConnectManager.HcState,
@@ -736,7 +905,7 @@ fun HealthConnectCard(
             .background(SyncDarkSurface)
             .border(
                 1.dp,
-                if (isReady) SyncGreen else SyncMidGray,
+                if (isReady) SyncGreen else SyncMagenta,
                 RoundedCornerShape(12.dp)
             )
             .padding(16.dp),
@@ -764,8 +933,7 @@ fun HealthConnectCard(
                             "Permissions required"
                         is HealthConnectManager.HcState.Ready ->
                             "$biosignalCount biosignals · $sleepCount sleep sessions"
-                        is HealthConnectManager.HcState.Error ->
-                            hcState.message
+                        is HealthConnectManager.HcState.Error -> hcState.message
                     },
                     fontSize = 11.sp,
                     color = SyncLightGray
@@ -789,7 +957,6 @@ fun HealthConnectCard(
             )
         }
 
-        // Biosignal stats row
         if (biosignalCount > 0 || sleepCount > 0) {
             Row(
                 modifier = Modifier
@@ -820,7 +987,6 @@ fun HealthConnectCard(
             }
         }
 
-        // Action buttons
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -859,234 +1025,19 @@ fun HealthConnectCard(
         }
     }
 }
+
 // ── Helper functions ──────────────────────────────────────────
 
 fun glucoseColor(mgDl: Int): Color = when {
-    mgDl < 70  -> GlucoseLow
-    mgDl <= 140 -> GlucoseNormal
-    mgDl <= 180 -> GlucoseHigh
-    else        -> GlucoseVeryHigh
+    mgDl < 70   -> Color(0xFFFF3D3D)
+    mgDl <= 140 -> Color(0xFF00FF77)
+    mgDl <= 180 -> Color(0xFFFFD600)
+    else        -> Color(0xFFFF3D3D)
 }
 
 fun ketoneColor(mmol: Double): Color = when {
-    mmol < 0.5  -> KetoneSubKetosis
-    mmol <= 3.0 -> KetoneNutritional
-    mmol <= 5.0 -> KetoneElevated
-    else        -> KetoneHigh
-}
-
-
-
-
-
-
-@Composable
-fun DailyCovariatesCard(
-    caffeineMg: Double,
-    meditationAm: Int,
-    meditationPm: Int,
-    isLogged: Boolean,
-    onLog: (caffeine: Double, am: Int, pm: Int) -> Unit,
-    onReset: () -> Unit
-) {
-    var caffeineInput by remember { mutableStateOf(caffeineMg.toInt().toString()) }
-    var amInput by remember { mutableStateOf(if (meditationAm > 0) meditationAm.toString() else "") }
-    var pmInput by remember { mutableStateOf(if (meditationPm > 0) meditationPm.toString() else "") }
-    var expanded by remember { mutableStateOf(!isLogged) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(SyncDarkSurface)
-            .border(
-                1.dp,
-                if (isLogged) SyncGreen else SyncMagenta,
-                RoundedCornerShape(12.dp)
-            )
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // ── Header ────────────────────────────────────────────
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "Daily Covariates",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (isLogged) SyncGreen else SyncWhite
-                )
-                Text(
-                    text = if (isLogged)
-                        "Logged ✓ — caffeine ${caffeineMg.toInt()}mg · " +
-                                "AM ${meditationAm}min · PM ${meditationPm}min"
-                    else
-                        "Log today's caffeine and meditation",
-                    fontSize = 11.sp,
-                    color = SyncLightGray
-                )
-            }
-            TextButton(onClick = { expanded = !expanded }) {
-                Text(
-                    text = if (expanded) "Hide" else "Edit",
-                    color = if (isLogged) SyncLightGray else SyncMagenta,
-                    fontSize = 11.sp
-                )
-            }
-        }
-
-        // ── Entry fields ──────────────────────────────────────
-        if (expanded) {
-            // Caffeine
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Caffeine (mg)",
-                        fontSize = 11.sp,
-                        color = SyncLightGray
-                    )
-                    Text(
-                        text = "46g grounds ≈ 400mg (~5 cups)",
-                        fontSize = 9.sp,
-                        color = SyncMidGray
-                    )
-                }
-                OutlinedTextField(
-                    value = caffeineInput,
-                    onValueChange = { caffeineInput = it },
-                    modifier = Modifier.width(100.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor   = SyncGreen,
-                        unfocusedBorderColor = SyncMidGray,
-                        focusedTextColor     = SyncWhite,
-                        unfocusedTextColor   = SyncWhite,
-                        cursorColor          = SyncGreen
-                    ),
-                    singleLine = true,
-                    suffix = { Text("mg", color = SyncLightGray, fontSize = 11.sp) }
-                )
-            }
-
-            HorizontalDivider(color = SyncMidGray, thickness = 0.5.dp)
-
-            // Meditation AM
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Meditation AM",
-                        fontSize = 11.sp,
-                        color = SyncLightGray
-                    )
-                    Text(
-                        text = "Morning session duration",
-                        fontSize = 9.sp,
-                        color = SyncMidGray
-                    )
-                }
-                OutlinedTextField(
-                    value = amInput,
-                    onValueChange = { amInput = it },
-                    modifier = Modifier.width(100.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor   = SyncGreen,
-                        unfocusedBorderColor = SyncMidGray,
-                        focusedTextColor     = SyncWhite,
-                        unfocusedTextColor   = SyncWhite,
-                        cursorColor          = SyncGreen
-                    ),
-                    singleLine = true,
-                    suffix = { Text("min", color = SyncLightGray, fontSize = 11.sp) }
-                )
-            }
-
-            // Meditation PM
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Meditation PM",
-                        fontSize = 11.sp,
-                        color = SyncLightGray
-                    )
-                    Text(
-                        text = "Evening session duration",
-                        fontSize = 9.sp,
-                        color = SyncMidGray
-                    )
-                }
-                OutlinedTextField(
-                    value = pmInput,
-                    onValueChange = { pmInput = it },
-                    modifier = Modifier.width(100.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor   = SyncGreen,
-                        unfocusedBorderColor = SyncMidGray,
-                        focusedTextColor     = SyncWhite,
-                        unfocusedTextColor   = SyncWhite,
-                        cursorColor          = SyncGreen
-                    ),
-                    singleLine = true,
-                    suffix = { Text("min", color = SyncLightGray, fontSize = 11.sp) }
-                )
-            }
-
-            // ── Action buttons ────────────────────────────────
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = {
-                        val caffeine = caffeineInput.toDoubleOrNull() ?: 400.0
-                        val am = amInput.toIntOrNull() ?: 0
-                        val pm = pmInput.toIntOrNull() ?: 0
-                        onLog(caffeine, am, pm)
-                        expanded = false
-                    },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = SyncGreen
-                    )
-                ) {
-                    Text(
-                        text = "Log Today",
-                        color = SyncBlack,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                if (isLogged) {
-                    OutlinedButton(
-                        onClick = {
-                            onReset()
-                            caffeineInput = "400"
-                            amInput = ""
-                            pmInput = ""
-                            expanded = true
-                        },
-                        modifier = Modifier.weight(1f),
-                        border = ButtonDefaults.outlinedButtonBorder.copy(
-                            brush = androidx.compose.ui.graphics.SolidColor(SyncLightGray)
-                        )
-                    ) {
-                        Text("Reset", color = SyncLightGray)
-                    }
-                }
-            }
-        }
-    }
+    mmol < 0.5  -> Color(0xFF9E9E9E)
+    mmol <= 3.0 -> Color(0xFF00FF77)
+    mmol <= 5.0 -> Color(0xFFFFD600)
+    else        -> Color(0xFFFF3D3D)
 }

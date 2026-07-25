@@ -5,15 +5,17 @@ object Constants {
     // ── Dexcom OAuth ──────────────────────────────────────────
     // Replace DEXCOM_CLIENT_ID with your actual Client ID from developer.dexcom.com
     const val DEXCOM_CLIENT_ID     = "REDACTED"
-    const val DEXCOM_REDIRECT_URI  = "https://localhost/oauth/callback"
+    const val DEXCOM_REDIRECT_URI = "https://danaharper151.github.io/synchronize-oauth/"
+    const val DEXCOM_APP_REDIRECT_URI = "com.synchronize.app://oauth/callback"
     const val DEXCOM_SCOPE         = "offline_access"
+    const val DEXCOM_CLIENT_SECRET = "REDACTED"
 
     // Sandbox (development) — switch to PROD_BASE_URL when ready for real data
     const val DEXCOM_SANDBOX_BASE_URL = "https://sandbox-api.dexcom.com/"
     const val DEXCOM_PROD_BASE_URL    = "https://api.dexcom.com/"
 
     // Toggle this to false when switching to production data
-    const val USE_SANDBOX = true
+    const val USE_SANDBOX = false
 
     val DEXCOM_BASE_URL get() = if (USE_SANDBOX) DEXCOM_SANDBOX_BASE_URL
     else DEXCOM_PROD_BASE_URL

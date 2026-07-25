@@ -9,6 +9,8 @@ import com.synchronize.app.data.db.entity.KetoneReading
 import com.synchronize.app.data.db.entity.MealEntry
 import com.synchronize.app.data.db.entity.SleepSession
 import com.synchronize.app.data.repository.SynchronizeRepository
+import com.synchronize.app.util.Constants
+import com.synchronize.app.util.DexcomAuthManager
 import com.synchronize.app.util.KetoMojoManager
 import com.synchronize.app.util.VoiceInputManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +22,7 @@ import com.synchronize.app.util.HealthConnectManager
 // import com.synchronize.app.util.DashboardWebSocketServer
 import kotlinx.coroutines.Dispatchers
 import com.synchronize.app.util.ReminderManager
+import kotlinx.coroutines.withContext
 
 class MainViewModel(private val repository: SynchronizeRepository) : ViewModel() {
 
@@ -436,6 +439,7 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
     fun clearVoiceTranscription() {
         _voiceTranscription.value = null
     }
+
 
     // ── ViewModelFactory ──────────────────────────────────────
 
