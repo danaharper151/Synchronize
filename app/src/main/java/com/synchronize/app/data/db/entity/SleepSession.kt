@@ -2,8 +2,12 @@ package com.synchronize.app.data.db.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import androidx.room.Index
 
-@Entity(tableName = "sleep_sessions")
+@Entity(
+    tableName = "sleep_sessions",
+    indices = [Index(value = ["sleepStartTimestamp"], unique = true)]
+)
 data class SleepSession(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

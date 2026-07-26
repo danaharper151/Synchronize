@@ -23,6 +23,7 @@ import com.synchronize.app.util.HealthConnectManager
 import kotlinx.coroutines.Dispatchers
 import com.synchronize.app.util.ReminderManager
 import kotlinx.coroutines.withContext
+import com.synchronize.app.data.db.entity.ExerciseSession
 
 class MainViewModel(private val repository: SynchronizeRepository) : ViewModel() {
 
@@ -119,6 +120,60 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
         _covariatesLoggedToday.value = false
         _meditationAmMinutes.value = 0
         _meditationPmMinutes.value = 0
+    }
+
+    // ── Exercise sessions ─────────────────────────────────────────
+    private val _todayExercise = MutableStateFlow<ExerciseSession?>(null)
+    val todayExercise: StateFlow<ExerciseSession?> = _todayExercise
+
+    val allExerciseSessions = repository.getAllExerciseSessions()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun refreshTodayExercise() {
+        viewModelScope.launch {
+            val cal = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }
+            val dayStart = cal.timeInMillis
+            val dayEnd = dayStart + 24 * 60 * 60 * 1000L
+            _todayExercise.value = repository.getExerciseSessionForDay(dayStart, dayEnd)
+        }
+    }
+
+    fun logExerciseSession(
+        sessionType: String,
+        durationMinutes: Int,
+        startTimestamp: Long = System.currentTimeMillis()
+    ) {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val session = ExerciseSession(
+                subjectId        = Constants.SUBJECT_ID,
+                deviceTimestamp  = now,
+                receiveTimestamp = now,
+                startTimestamp   = startTimestamp,
+                durationMinutes  = durationMinutes,
+                sessionType      = sessionType,
+                isHiit           = sessionType == ExerciseSession.TYPE_HIIT,
+                notes            = null
+            )
+            repository.insertExerciseSession(session)
+            _todayExercise.value = session
+            refreshDataQuality()
+            android.util.Log.d("MainViewModel",
+                "Exercise logged: $sessionType, ${durationMinutes}min")
+        }
+    }
+
+    fun deleteExerciseSession(id: Long) {
+        viewModelScope.launch {
+            repository.deleteExerciseSession(id)
+            refreshTodayExercise()
+            refreshDataQuality()
+        }
     }
 
     // ── Keto-Mojo BLE ─────────────────────────────────────────────
@@ -323,6 +378,7 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
     init {
         refreshLatestReadings()
         refreshDataQuality()
+        refreshTodayExercise()
         viewModelScope.launch(Dispatchers.IO) {
             kotlinx.coroutines.delay(3000) // wait for UI to load first
             // startWebSocketServer()
@@ -394,14 +450,13 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
 
     fun confirmPendingMealEntry() {
         viewModelScope.launch {
-            _pendingMealEntry.value?.let { entry ->
-                val id = repository.insertMealEntry(entry)
-                repository.confirmMealEntry(id)
-                _pendingMealEntry.value = null
-                _latestMeal.value = entry
-                refreshDataQuality()
-                //broadcastAllData()  // push to web dashboard immediately
-            }
+            val entry = _pendingMealEntry.value ?: return@launch
+            _pendingMealEntry.value = null          // clear FIRST
+            _voiceTranscription.value = null
+            val id = repository.insertMealEntry(entry)
+            repository.confirmMealEntry(id)
+            _latestMeal.value = entry
+            refreshDataQuality()
         }
     }
 

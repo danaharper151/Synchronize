@@ -37,6 +37,12 @@ fun KetoneScreen(viewModel: MainViewModel) {
     var manualSystolic by remember { mutableStateOf("") }
     var manualDiastolic by remember { mutableStateOf("") }
     var showConfirmation by remember { mutableStateOf(false) }
+    var manualDateTime by remember {
+        mutableStateOf(
+            java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+                .format(java.util.Date())
+        )
+    }
 
     val contexts = listOf(
         Constants.CONTEXT_FASTING,
@@ -182,6 +188,22 @@ fun KetoneScreen(viewModel: MainViewModel) {
                 ),
                 singleLine = true
             )
+            OutlinedTextField(
+                value = manualDateTime,
+                onValueChange = { manualDateTime = it },
+                label = {
+                    Text("Time (yyyy-MM-dd HH:mm)", color = SyncLightGray, fontSize = 11.sp)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor   = SyncGreen,
+                    unfocusedBorderColor = SyncMidGray,
+                    focusedTextColor     = SyncWhite,
+                    unfocusedTextColor   = SyncWhite,
+                    cursorColor          = SyncGreen
+                ),
+                singleLine = true
+            )
 
             // Fasting-only fields: paired glucose + manual BP
             if (selectedContext == Constants.CONTEXT_FASTING) {
@@ -257,7 +279,12 @@ fun KetoneScreen(viewModel: MainViewModel) {
                 onClick = {
                     val bhb = manualBhb.toDoubleOrNull()
                     if (bhb != null) {
-                        val now = System.currentTimeMillis()
+                        val fmt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+                        val now = try {
+                            fmt.parse(manualDateTime)?.time ?: System.currentTimeMillis()
+                        } catch (e: Exception) {
+                            System.currentTimeMillis()
+                        }
                         val bpNote = if (selectedContext == Constants.CONTEXT_FASTING &&
                             manualSystolic.isNotBlank() && manualDiastolic.isNotBlank())
                             "BP:${manualSystolic}/${manualDiastolic}mmHg" else null
@@ -277,8 +304,10 @@ fun KetoneScreen(viewModel: MainViewModel) {
                         manualSystolic = ""
                         manualDiastolic = ""
                         showConfirmation = true
+                        manualDateTime = fmt.format(java.util.Date())
                     }
                 },
+
                 modifier = Modifier.fillMaxWidth(),
                 enabled = manualBhb.toDoubleOrNull() != null,
                 colors = ButtonDefaults.buttonColors(

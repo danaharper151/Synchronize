@@ -39,7 +39,7 @@ class KetoMojoManager(private val context: Context) {
             UUID.fromString("00002a52-0000-1000-8000-00805f9b34fb")
 
         // Keto-Mojo device name prefix
-        const val DEVICE_NAME_PREFIX = "KMG+"
+        const val DEVICE_NAME_PREFIX = "GK+1633"
     }
 
     // ── State ─────────────────────────────────────────────────

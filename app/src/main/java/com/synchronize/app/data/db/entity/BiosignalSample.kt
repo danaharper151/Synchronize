@@ -2,8 +2,12 @@ package com.synchronize.app.data.db.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import androidx.room.Index
 
-@Entity(tableName = "biosignal_samples")
+@Entity(
+    tableName = "biosignal_samples",
+    indices = [Index(value = ["deviceTimestamp"], unique = true)]
+)
 data class BiosignalSample(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

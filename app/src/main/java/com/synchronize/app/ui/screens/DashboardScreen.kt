@@ -33,11 +33,14 @@ import com.synchronize.app.util.VoiceInputManager
 import java.time.Instant
 import kotlinx.coroutines.launch
 import com.synchronize.app.MainActivity
+import androidx.compose.runtime.DisposableEffect
+import com.synchronize.app.data.db.entity.ExerciseSession
 
 @Composable
 fun DashboardScreen(viewModel: MainViewModel) {
 
     val context = LocalContext.current
+    val activity = context as MainActivity
 
     // ── State collectors ──────────────────────────────────────
     val latestGlucose     by viewModel.latestGlucose.collectAsState()
@@ -57,7 +60,9 @@ fun DashboardScreen(viewModel: MainViewModel) {
     val meditationAm      by viewModel.meditationAmMinutes.collectAsState()
     val meditationPm      by viewModel.meditationPmMinutes.collectAsState()
     val covariatesLogged  by viewModel.covariatesLoggedToday.collectAsState()
-    val activity = context as MainActivity
+    val todayExercise by viewModel.todayExercise.collectAsState()
+
+
 
 
 
@@ -107,6 +112,9 @@ fun DashboardScreen(viewModel: MainViewModel) {
                 else -> {}
             }
         }
+    }
+    DisposableEffect(Unit) {
+        onDispose { viewModel.discardPendingMealEntry() }
     }
 
 
@@ -213,6 +221,14 @@ fun DashboardScreen(viewModel: MainViewModel) {
             onReset = { viewModel.resetDailyCovariates() }
         )
 
+        ExerciseCard(
+            todaySession = todayExercise,
+            onLog = { type, mins ->
+                viewModel.logExerciseSession(type, mins)
+            },
+            onClear = { id -> viewModel.deleteExerciseSession(id) }
+        )
+
         // ── Data quality card ─────────────────────────────────
         if (dataQuality.isNotEmpty()) {
             DataQualityCard(dataQuality = dataQuality)
@@ -244,8 +260,11 @@ fun DashboardScreen(viewModel: MainViewModel) {
             biosignalCount = dataQuality["biosignals"] ?: 0,
             sleepCount = dataQuality["sleep"] ?: 0,
             onSyncClick = {
-                viewModel.initHealthConnect(context)
-                viewModel.syncBiosignals()
+                if (hcState is HealthConnectManager.HcState.Ready) {
+                    viewModel.syncBiosignals()
+                } else {
+                    activity.requestHealthConnectPermissions()
+                }
             },
             onSyncSleepClick = {
                 viewModel.initHealthConnect(context)
@@ -654,6 +673,208 @@ fun DailyCovariatesCard(
         }
     }
 }
+// Exercise card
+@Composable
+fun ExerciseCard(
+    todaySession: ExerciseSession?,
+    onLog: (type: String, durationMinutes: Int) -> Unit,
+    onClear: (Long) -> Unit
+) {
+    val isLogged = todaySession != null
+    var selectedType by remember(todaySession) {
+        mutableStateOf(todaySession?.sessionType ?: ExerciseSession.TYPE_HIIT)
+    }
+    var durationInput by remember(todaySession) {
+        mutableStateOf(todaySession?.durationMinutes?.toString() ?: "60")
+    }
+    var expanded by remember(todaySession) { mutableStateOf(!isLogged) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(SyncDarkSurface)
+            .border(
+                1.dp,
+                if (isLogged) SyncGreen else SyncMagenta,
+                RoundedCornerShape(12.dp)
+            )
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+
+        // ── Header ────────────────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Exercise",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isLogged) SyncGreen else SyncWhite
+                )
+                Text(
+                    text = todaySession?.let {
+                        "Logged ✓ — ${ExerciseSession.displayName(it.sessionType)} · " +
+                                "${it.durationMinutes} min"
+                    } ?: "Log today's session",
+                    fontSize = 11.sp,
+                    color = SyncLightGray
+                )
+            }
+            TextButton(onClick = { expanded = !expanded }) {
+                Text(
+                    text = if (expanded) "Hide" else "Edit",
+                    color = if (isLogged) SyncLightGray else SyncMagenta,
+                    fontSize = 11.sp
+                )
+            }
+        }
+
+        if (expanded) {
+
+            // ── Session type ──────────────────────────────────
+            Text(
+                text = "Session type",
+                fontSize = 11.sp,
+                color = SyncLightGray
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                ExerciseSession.ALL_TYPES.take(2).forEach { type ->
+                    ExerciseTypeChip(
+                        label = ExerciseSession.displayName(type),
+                        selected = selectedType == type,
+                        onClick = { selectedType = type },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                ExerciseSession.ALL_TYPES.drop(2).forEach { type ->
+                    ExerciseTypeChip(
+                        label = ExerciseSession.displayName(type),
+                        selected = selectedType == type,
+                        onClick = { selectedType = type },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            // ── Duration ──────────────────────────────────────
+            if (selectedType != ExerciseSession.TYPE_REST) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Duration", fontSize = 11.sp, color = SyncLightGray)
+                        Text(
+                            text = "Total session length",
+                            fontSize = 9.sp,
+                            color = SyncMidGray
+                        )
+                    }
+                    OutlinedTextField(
+                        value = durationInput,
+                        onValueChange = { durationInput = it },
+                        modifier = Modifier.width(100.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor   = SyncGreen,
+                            unfocusedBorderColor = SyncMidGray,
+                            focusedTextColor     = SyncWhite,
+                            unfocusedTextColor   = SyncWhite,
+                            cursorColor          = SyncGreen
+                        ),
+                        singleLine = true,
+                        suffix = {
+                            Text("min", color = SyncLightGray, fontSize = 11.sp)
+                        }
+                    )
+                }
+            }
+
+            // ── Actions ───────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = {
+                        val mins = if (selectedType == ExerciseSession.TYPE_REST) 0
+                        else durationInput.toIntOrNull() ?: 0
+                        onLog(selectedType, mins)
+                        expanded = false
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = SyncGreen)
+                ) {
+                    Text(
+                        text = if (isLogged) "Update" else "Log Session",
+                        color = SyncBlack,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (isLogged) {
+                    OutlinedButton(
+                        onClick = { todaySession?.let { onClear(it.id) } },
+                        modifier = Modifier.weight(1f),
+                        border = ButtonDefaults.outlinedButtonBorder.copy(
+                            brush = SolidColor(SyncLightGray)
+                        )
+                    ) {
+                        Text("Clear", color = SyncLightGray)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Type chip ─────────────────────────────────────────────────
+
+@Composable
+fun ExerciseTypeChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (selected) SyncGreen else SyncDarkGray)
+            .border(
+                1.dp,
+                if (selected) SyncGreen else SyncMidGray,
+                RoundedCornerShape(8.dp)
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        TextButton(
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(vertical = 10.dp, horizontal = 4.dp)
+        ) {
+            Text(
+                text = label,
+                fontSize = 10.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                color = if (selected) SyncBlack else SyncLightGray,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
 
 // ── Dexcom Connect Card ───────────────────────────────────────
 
@@ -897,6 +1118,7 @@ fun HealthConnectCard(
     onSyncSleepClick: () -> Unit
 ) {
     val isReady = hcState is HealthConnectManager.HcState.Ready
+
 
     Column(
         modifier = Modifier

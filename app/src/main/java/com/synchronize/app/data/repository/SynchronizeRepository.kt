@@ -7,6 +7,7 @@ import com.synchronize.app.data.db.entity.KetoneReading
 import com.synchronize.app.data.db.entity.MealEntry
 import com.synchronize.app.data.db.entity.SleepSession
 import kotlinx.coroutines.flow.Flow
+import com.synchronize.app.data.db.entity.ExerciseSession
 
 class SynchronizeRepository(private val db: SynchronizeDatabase) {
 
@@ -143,6 +144,32 @@ class SynchronizeRepository(private val db: SynchronizeDatabase) {
     suspend fun getMealCount(): Int =
         db.mealEntryDao().getCount()
 
+    // ── Exercise ──────────────────────────────────────────────
+
+    suspend fun insertExerciseSession(session: ExerciseSession): Long =
+        db.exerciseSessionDao().insert(session)
+
+    suspend fun updateExerciseSession(session: ExerciseSession) =
+        db.exerciseSessionDao().update(session)
+
+    fun getAllExerciseSessions(): Flow<List<ExerciseSession>> =
+        db.exerciseSessionDao().getAllSessions()
+
+    fun getExerciseSessionsInRange(startTime: Long, endTime: Long): Flow<List<ExerciseSession>> =
+        db.exerciseSessionDao().getSessionsInRange(startTime, endTime)
+
+    suspend fun getLatestExerciseSession(): ExerciseSession? =
+        db.exerciseSessionDao().getLatestSession()
+
+    suspend fun getExerciseSessionForDay(dayStart: Long, dayEnd: Long): ExerciseSession? =
+        db.exerciseSessionDao().getSessionForDay(dayStart, dayEnd)
+
+    suspend fun deleteExerciseSession(id: Long) =
+        db.exerciseSessionDao().deleteById(id)
+
+    suspend fun getExerciseCount(): Int =
+        db.exerciseSessionDao().getCount()
+
     // ── Data quality summary ──────────────────────────────────
 
     suspend fun getDataQualitySummary(): Map<String, Int> = mapOf(
@@ -150,6 +177,7 @@ class SynchronizeRepository(private val db: SynchronizeDatabase) {
         "ketones" to getKetoneCount(),
         "biosignals" to getBiosignalCount(),
         "sleep" to getSleepCount(),
-        "meals" to getMealCount()
+        "meals" to getMealCount(),
+        "exercise" to getExerciseCount()
     )
 }

@@ -15,6 +15,8 @@ import com.synchronize.app.data.db.entity.KetoneReading
 import com.synchronize.app.data.db.entity.MealEntry
 import com.synchronize.app.data.db.entity.SleepSession
 import net.sqlcipher.database.SupportFactory
+import com.synchronize.app.data.db.dao.ExerciseSessionDao
+import com.synchronize.app.data.db.entity.ExerciseSession
 
 @Database(
     entities = [
@@ -22,9 +24,10 @@ import net.sqlcipher.database.SupportFactory
         KetoneReading::class,
         BiosignalSample::class,
         SleepSession::class,
-        MealEntry::class
+        MealEntry::class,
+        ExerciseSession::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class SynchronizeDatabase : RoomDatabase() {
@@ -34,6 +37,7 @@ abstract class SynchronizeDatabase : RoomDatabase() {
     abstract fun biosignalSampleDao(): BiosignalSampleDao
     abstract fun sleepSessionDao(): SleepSessionDao
     abstract fun mealEntryDao(): MealEntryDao
+    abstract fun exerciseSessionDao(): ExerciseSessionDao
 
     companion object {
         @Volatile

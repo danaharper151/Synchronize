@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import net.openid.appauth.AuthorizationException
 import net.openid.appauth.AuthorizationResponse
 import net.openid.appauth.AuthorizationService
+import androidx.health.connect.client.PermissionController
 
 class MainActivity : FragmentActivity() {
 
@@ -111,6 +112,20 @@ class MainActivity : FragmentActivity() {
             android.util.Log.d("MainActivity",
                 "$perm: ${if (granted) "granted" else "denied"}")
         }
+    }
+    private val healthConnectPermissionLauncher = registerForActivityResult(
+        PermissionController.createRequestPermissionResultContract()
+    ) { granted ->
+        android.util.Log.d("HealthConnect", "Granted: ${granted.size} permissions")
+        granted.forEach { android.util.Log.d("HealthConnect", "  $it") }
+        if (granted.isNotEmpty()) {
+            viewModel.initHealthConnect(this)
+        }
+    }
+
+    fun requestHealthConnectPermissions() {
+        val manager = com.synchronize.app.util.HealthConnectManager(this)
+        healthConnectPermissionLauncher.launch(manager.requiredPermissions)
     }
 
     // ── onCreate ──────────────────────────────────────────────
