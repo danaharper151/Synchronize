@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.synchronize.app.data.db.dao.BiosignalSampleDao
+import com.synchronize.app.data.db.dao.DailyCovariateDao
 import com.synchronize.app.data.db.dao.GlucoseReadingDao
 import com.synchronize.app.data.db.dao.KetoneReadingDao
 import com.synchronize.app.data.db.dao.MealEntryDao
@@ -16,6 +17,7 @@ import com.synchronize.app.data.db.entity.MealEntry
 import com.synchronize.app.data.db.entity.SleepSession
 import net.sqlcipher.database.SupportFactory
 import com.synchronize.app.data.db.dao.ExerciseSessionDao
+import com.synchronize.app.data.db.entity.DailyCovariate
 import com.synchronize.app.data.db.entity.ExerciseSession
 
 @Database(
@@ -25,9 +27,12 @@ import com.synchronize.app.data.db.entity.ExerciseSession
         BiosignalSample::class,
         SleepSession::class,
         MealEntry::class,
-        ExerciseSession::class
+        ExerciseSession::class,
+        DailyCovariate::class
+
+
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class SynchronizeDatabase : RoomDatabase() {
@@ -38,6 +43,7 @@ abstract class SynchronizeDatabase : RoomDatabase() {
     abstract fun sleepSessionDao(): SleepSessionDao
     abstract fun mealEntryDao(): MealEntryDao
     abstract fun exerciseSessionDao(): ExerciseSessionDao
+    abstract fun dailyCovariateDao(): DailyCovariateDao
 
     companion object {
         @Volatile
@@ -51,7 +57,7 @@ abstract class SynchronizeDatabase : RoomDatabase() {
                     SynchronizeDatabase::class.java,
                     DB_NAME
                 )
-                    .fallbackToDestructiveMigration(true)
+                    // NO destructive migration — data must never be silently wiped
                     .build()
                 INSTANCE = instance
                 instance

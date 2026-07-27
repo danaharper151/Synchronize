@@ -35,6 +35,8 @@ import kotlinx.coroutines.launch
 import com.synchronize.app.MainActivity
 import androidx.compose.runtime.DisposableEffect
 import com.synchronize.app.data.db.entity.ExerciseSession
+import androidx.compose.foundation.clickable
+import com.synchronize.app.data.db.entity.DailyCovariate
 
 @Composable
 fun DashboardScreen(viewModel: MainViewModel) {
@@ -61,6 +63,11 @@ fun DashboardScreen(viewModel: MainViewModel) {
     val meditationPm      by viewModel.meditationPmMinutes.collectAsState()
     val covariatesLogged  by viewModel.covariatesLoggedToday.collectAsState()
     val todayExercise by viewModel.todayExercise.collectAsState()
+    val allExerciseSessions by viewModel.allExerciseSessions.collectAsState()
+    var exerciseToEdit by remember { mutableStateOf<ExerciseSession?>(null) }
+    val covariateDateKey by viewModel.covariateDateKey.collectAsState()
+    val allCovariates by viewModel.allCovariates.collectAsState()
+
 
 
 
@@ -215,18 +222,22 @@ fun DashboardScreen(viewModel: MainViewModel) {
             meditationAm = meditationAm,
             meditationPm = meditationPm,
             isLogged = covariatesLogged,
+            dateKey = covariateDateKey,
+            allCovariates = allCovariates,
+            onDateChange = { viewModel.setCovariateDateKey(it) },
             onLog = { caffeine, am, pm ->
                 viewModel.logDailyCovariates(caffeine, am, pm)
             },
-            onReset = { viewModel.resetDailyCovariates() }
+            onDelete = { id -> viewModel.deleteCovariate(id) }
         )
 
         ExerciseCard(
             todaySession = todayExercise,
-            onLog = { type, mins ->
-                viewModel.logExerciseSession(type, mins)
+            allSessions = allExerciseSessions,
+            onLog = { type, mins, ts ->
+                viewModel.logExerciseSession(type, mins, ts)
             },
-            onClear = { id -> viewModel.deleteExerciseSession(id) }
+            onEditRequest = { exerciseToEdit = it }
         )
 
         // ── Data quality card ─────────────────────────────────
@@ -279,6 +290,20 @@ fun DashboardScreen(viewModel: MainViewModel) {
             biosignalCount = dataQuality["biosignals"] ?: 0,
             sleepCount = dataQuality["sleep"] ?: 0,
             mealCount = dataQuality["meals"] ?: 0
+        )
+    }
+    exerciseToEdit?.let { session ->
+        ExerciseEditDialog(
+            session = session,
+            onSave = {
+                viewModel.updateExerciseSession(it)
+                exerciseToEdit = null
+            },
+            onDelete = { id ->
+                viewModel.deleteExerciseSession(id)
+                exerciseToEdit = null
+            },
+            onDismiss = { exerciseToEdit = null }
         )
     }
 }
@@ -491,7 +516,7 @@ fun StreamStatusRow(label: String, count: Int, unit: String) {
     }
 }
 
-// ── Daily Covariates Card ─────────────────────────────────────
+// ── Daily Covariates Card (with date + history) ───────────────
 
 @Composable
 fun DailyCovariatesCard(
@@ -499,195 +524,24 @@ fun DailyCovariatesCard(
     meditationAm: Int,
     meditationPm: Int,
     isLogged: Boolean,
+    dateKey: String,
+    allCovariates: List<DailyCovariate>,
+    onDateChange: (String) -> Unit,
     onLog: (caffeine: Double, am: Int, pm: Int) -> Unit,
-    onReset: () -> Unit
+    onDelete: (Long) -> Unit
 ) {
-    var caffeineInput by remember { mutableStateOf(caffeineMg.toInt().toString()) }
-    var amInput by remember {
+    var caffeineInput by remember(caffeineMg) {
+        mutableStateOf(caffeineMg.toInt().toString())
+    }
+    var amInput by remember(meditationAm) {
         mutableStateOf(if (meditationAm > 0) meditationAm.toString() else "")
     }
-    var pmInput by remember {
+    var pmInput by remember(meditationPm) {
         mutableStateOf(if (meditationPm > 0) meditationPm.toString() else "")
     }
+    var dateInput by remember(dateKey) { mutableStateOf(dateKey) }
     var expanded by remember { mutableStateOf(!isLogged) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(SyncDarkSurface)
-            .border(
-                1.dp,
-                if (isLogged) SyncGreen else SyncMagenta,
-                RoundedCornerShape(12.dp)
-            )
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "Daily Covariates",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (isLogged) SyncGreen else SyncWhite
-                )
-                Text(
-                    text = if (isLogged)
-                        "Logged ✓ — caffeine ${caffeineMg.toInt()}mg · " +
-                                "AM ${meditationAm}min · PM ${meditationPm}min"
-                    else "Log today's caffeine and meditation",
-                    fontSize = 11.sp,
-                    color = SyncLightGray
-                )
-            }
-            TextButton(onClick = { expanded = !expanded }) {
-                Text(
-                    text = if (expanded) "Hide" else "Edit",
-                    color = if (isLogged) SyncLightGray else SyncMagenta,
-                    fontSize = 11.sp
-                )
-            }
-        }
-
-        if (expanded) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Caffeine (mg)", fontSize = 11.sp, color = SyncLightGray)
-                    Text("46g grounds ≈ 400mg (~5 cups)",
-                        fontSize = 9.sp, color = SyncMidGray)
-                }
-                OutlinedTextField(
-                    value = caffeineInput,
-                    onValueChange = { caffeineInput = it },
-                    modifier = Modifier.width(100.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor   = SyncGreen,
-                        unfocusedBorderColor = SyncMidGray,
-                        focusedTextColor     = SyncWhite,
-                        unfocusedTextColor   = SyncWhite,
-                        cursorColor          = SyncGreen
-                    ),
-                    singleLine = true,
-                    suffix = { Text("mg", color = SyncLightGray, fontSize = 11.sp) }
-                )
-            }
-
-            HorizontalDivider(color = SyncMidGray, thickness = 0.5.dp)
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Meditation AM", fontSize = 11.sp, color = SyncLightGray)
-                    Text("Morning session duration",
-                        fontSize = 9.sp, color = SyncMidGray)
-                }
-                OutlinedTextField(
-                    value = amInput,
-                    onValueChange = { amInput = it },
-                    modifier = Modifier.width(100.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor   = SyncGreen,
-                        unfocusedBorderColor = SyncMidGray,
-                        focusedTextColor     = SyncWhite,
-                        unfocusedTextColor   = SyncWhite,
-                        cursorColor          = SyncGreen
-                    ),
-                    singleLine = true,
-                    suffix = { Text("min", color = SyncLightGray, fontSize = 11.sp) }
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Meditation PM", fontSize = 11.sp, color = SyncLightGray)
-                    Text("Evening session duration",
-                        fontSize = 9.sp, color = SyncMidGray)
-                }
-                OutlinedTextField(
-                    value = pmInput,
-                    onValueChange = { pmInput = it },
-                    modifier = Modifier.width(100.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor   = SyncGreen,
-                        unfocusedBorderColor = SyncMidGray,
-                        focusedTextColor     = SyncWhite,
-                        unfocusedTextColor   = SyncWhite,
-                        cursorColor          = SyncGreen
-                    ),
-                    singleLine = true,
-                    suffix = { Text("min", color = SyncLightGray, fontSize = 11.sp) }
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = {
-                        val caffeine = caffeineInput.toDoubleOrNull() ?: 400.0
-                        val am = amInput.toIntOrNull() ?: 0
-                        val pm = pmInput.toIntOrNull() ?: 0
-                        onLog(caffeine, am, pm)
-                        expanded = false
-                    },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = SyncGreen)
-                ) {
-                    Text("Log Today", color = SyncBlack, fontWeight = FontWeight.Bold)
-                }
-                if (isLogged) {
-                    OutlinedButton(
-                        onClick = {
-                            onReset()
-                            caffeineInput = "400"
-                            amInput = ""
-                            pmInput = ""
-                            expanded = true
-                        },
-                        modifier = Modifier.weight(1f),
-                        border = ButtonDefaults.outlinedButtonBorder.copy(
-                            brush = SolidColor(SyncLightGray)
-                        )
-                    ) {
-                        Text("Reset", color = SyncLightGray)
-                    }
-                }
-            }
-        }
-    }
-}
-// Exercise card
-@Composable
-fun ExerciseCard(
-    todaySession: ExerciseSession?,
-    onLog: (type: String, durationMinutes: Int) -> Unit,
-    onClear: (Long) -> Unit
-) {
-    val isLogged = todaySession != null
-    var selectedType by remember(todaySession) {
-        mutableStateOf(todaySession?.sessionType ?: ExerciseSession.TYPE_HIIT)
-    }
-    var durationInput by remember(todaySession) {
-        mutableStateOf(todaySession?.durationMinutes?.toString() ?: "60")
-    }
-    var expanded by remember(todaySession) { mutableStateOf(!isLogged) }
+    var showHistory by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -711,16 +565,17 @@ fun ExerciseCard(
         ) {
             Column {
                 Text(
-                    text = "Exercise",
+                    text = "Daily Covariates",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = if (isLogged) SyncGreen else SyncWhite
                 )
                 Text(
-                    text = todaySession?.let {
-                        "Logged ✓ — ${ExerciseSession.displayName(it.sessionType)} · " +
-                                "${it.durationMinutes} min"
-                    } ?: "Log today's session",
+                    text = if (isLogged)
+                        "$dateKey ✓ — ${caffeineMg.toInt()}mg · " +
+                                "AM ${meditationAm}m · PM ${meditationPm}m"
+                    else
+                        "Not logged for $dateKey",
                     fontSize = 11.sp,
                     color = SyncLightGray
                 )
@@ -736,12 +591,254 @@ fun ExerciseCard(
 
         if (expanded) {
 
-            // ── Session type ──────────────────────────────────
-            Text(
-                text = "Session type",
-                fontSize = 11.sp,
-                color = SyncLightGray
+            // ── Date ──────────────────────────────────────────
+            OutlinedTextField(
+                value = dateInput,
+                onValueChange = {
+                    dateInput = it
+                    if (it.length == 10) onDateChange(it)
+                },
+                label = {
+                    Text("Date (yyyy-MM-dd)", color = SyncLightGray, fontSize = 11.sp)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor   = SyncGreen,
+                    unfocusedBorderColor = SyncMidGray,
+                    focusedTextColor     = SyncWhite,
+                    unfocusedTextColor   = SyncWhite,
+                    cursorColor          = SyncGreen
+                ),
+                singleLine = true
             )
+
+            HorizontalDivider(color = SyncMidGray, thickness = 0.5.dp)
+
+            // ── Caffeine ──────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Caffeine", fontSize = 11.sp, color = SyncLightGray)
+                    Text(
+                        "46g grounds ≈ 400mg",
+                        fontSize = 9.sp,
+                        color = SyncMidGray
+                    )
+                }
+                OutlinedTextField(
+                    value = caffeineInput,
+                    onValueChange = { caffeineInput = it },
+                    modifier = Modifier.width(100.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = SyncGreen,
+                        unfocusedBorderColor = SyncMidGray,
+                        focusedTextColor     = SyncWhite,
+                        unfocusedTextColor   = SyncWhite,
+                        cursorColor          = SyncGreen
+                    ),
+                    singleLine = true,
+                    suffix = { Text("mg", color = SyncLightGray, fontSize = 11.sp) }
+                )
+            }
+
+            // ── Meditation AM ─────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Meditation AM",
+                    fontSize = 11.sp,
+                    color = SyncLightGray,
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedTextField(
+                    value = amInput,
+                    onValueChange = { amInput = it },
+                    modifier = Modifier.width(100.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = SyncGreen,
+                        unfocusedBorderColor = SyncMidGray,
+                        focusedTextColor     = SyncWhite,
+                        unfocusedTextColor   = SyncWhite,
+                        cursorColor          = SyncGreen
+                    ),
+                    singleLine = true,
+                    suffix = { Text("min", color = SyncLightGray, fontSize = 11.sp) }
+                )
+            }
+
+            // ── Meditation PM ─────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Meditation PM",
+                    fontSize = 11.sp,
+                    color = SyncLightGray,
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedTextField(
+                    value = pmInput,
+                    onValueChange = { pmInput = it },
+                    modifier = Modifier.width(100.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = SyncGreen,
+                        unfocusedBorderColor = SyncMidGray,
+                        focusedTextColor     = SyncWhite,
+                        unfocusedTextColor   = SyncWhite,
+                        cursorColor          = SyncGreen
+                    ),
+                    singleLine = true,
+                    suffix = { Text("min", color = SyncLightGray, fontSize = 11.sp) }
+                )
+            }
+
+            Button(
+                onClick = {
+                    onLog(
+                        caffeineInput.toDoubleOrNull() ?: 400.0,
+                        amInput.toIntOrNull() ?: 0,
+                        pmInput.toIntOrNull() ?: 0
+                    )
+                    expanded = false
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = SyncGreen)
+            ) {
+                Text(
+                    text = if (isLogged) "Update $dateKey" else "Log $dateKey",
+                    color = SyncBlack,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        // ── History ───────────────────────────────────────────
+        if (allCovariates.isNotEmpty()) {
+            HorizontalDivider(color = SyncMidGray, thickness = 0.5.dp)
+            TextButton(
+                onClick = { showHistory = !showHistory },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (showHistory)
+                        "Hide history"
+                    else
+                        "Show history (${allCovariates.size} days)",
+                    color = SyncLightGray,
+                    fontSize = 11.sp
+                )
+            }
+
+            if (showHistory) {
+                allCovariates.take(60).forEach { cov ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onDateChange(cov.dateKey) }
+                            .padding(vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = cov.dateKey,
+                            fontSize = 11.sp,
+                            color = SyncWhite
+                        )
+                        Text(
+                            text = "${cov.caffeineMg.toInt()}mg · " +
+                                    "${cov.meditationAmMinutes}/${cov.meditationPmMinutes}m",
+                            fontSize = 10.sp,
+                            color = SyncLightGray
+                        )
+                    }
+                    HorizontalDivider(color = SyncMidGray, thickness = 0.5.dp)
+                }
+            }
+        }
+    }
+}
+// ── Exercise Card (with timestamp + history) ──────────────────
+
+@Composable
+fun ExerciseCard(
+    todaySession: ExerciseSession?,
+    allSessions: List<ExerciseSession>,
+    onLog: (type: String, durationMinutes: Int, startTimestamp: Long) -> Unit,
+    onEditRequest: (ExerciseSession) -> Unit
+) {
+    val fmt = remember {
+        java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+    }
+    val displayFmt = remember {
+        java.text.SimpleDateFormat("MMM d, h:mm a", java.util.Locale.getDefault())
+    }
+
+    var selectedType by remember { mutableStateOf(ExerciseSession.TYPE_HIIT) }
+    var durationInput by remember { mutableStateOf("60") }
+    var timestampInput by remember {
+        mutableStateOf(fmt.format(java.util.Date()))
+    }
+    var expanded by remember { mutableStateOf(todaySession == null) }
+    var showHistory by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(SyncDarkSurface)
+            .border(
+                1.dp,
+                if (todaySession != null) SyncGreen else SyncMagenta,
+                RoundedCornerShape(12.dp)
+            )
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+
+        // ── Header ────────────────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Exercise",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (todaySession != null) SyncGreen else SyncWhite
+                )
+                Text(
+                    text = todaySession?.let {
+                        "Today ✓ — ${ExerciseSession.displayName(it.sessionType)} · " +
+                                "${it.durationMinutes} min · " +
+                                displayFmt.format(java.util.Date(it.startTimestamp))
+                    } ?: "No session logged today",
+                    fontSize = 11.sp,
+                    color = SyncLightGray
+                )
+            }
+            TextButton(onClick = { expanded = !expanded }) {
+                Text(
+                    text = if (expanded) "Hide" else "Log",
+                    color = if (todaySession != null) SyncLightGray else SyncMagenta,
+                    fontSize = 11.sp
+                )
+            }
+        }
+
+        // ── Entry form ────────────────────────────────────────
+        if (expanded) {
+
+            Text("Session type", fontSize = 11.sp, color = SyncLightGray)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -769,70 +866,298 @@ fun ExerciseCard(
                 }
             }
 
-            // ── Duration ──────────────────────────────────────
             if (selectedType != ExerciseSession.TYPE_REST) {
-                Row(
+                OutlinedTextField(
+                    value = durationInput,
+                    onValueChange = { durationInput = it },
+                    label = {
+                        Text("Duration (minutes)", color = SyncLightGray, fontSize = 11.sp)
+                    },
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Duration", fontSize = 11.sp, color = SyncLightGray)
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = SyncGreen,
+                        unfocusedBorderColor = SyncMidGray,
+                        focusedTextColor     = SyncWhite,
+                        unfocusedTextColor   = SyncWhite,
+                        cursorColor          = SyncGreen
+                    ),
+                    singleLine = true
+                )
+            }
+
+            OutlinedTextField(
+                value = timestampInput,
+                onValueChange = { timestampInput = it },
+                label = {
+                    Text(
+                        "Start time (yyyy-MM-dd HH:mm)",
+                        color = SyncLightGray,
+                        fontSize = 11.sp
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor   = SyncGreen,
+                    unfocusedBorderColor = SyncMidGray,
+                    focusedTextColor     = SyncWhite,
+                    unfocusedTextColor   = SyncWhite,
+                    cursorColor          = SyncGreen
+                ),
+                singleLine = true
+            )
+
+            Button(
+                onClick = {
+                    val mins = if (selectedType == ExerciseSession.TYPE_REST) 0
+                    else durationInput.toIntOrNull() ?: 0
+                    val ts = try {
+                        fmt.parse(timestampInput)?.time ?: System.currentTimeMillis()
+                    } catch (e: Exception) {
+                        System.currentTimeMillis()
+                    }
+                    onLog(selectedType, mins, ts)
+                    // reset for next entry — keeps bulk entry fast
+                    timestampInput = fmt.format(java.util.Date())
+                    durationInput = "60"
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = SyncGreen)
+            ) {
+                Text("Log Session", color = SyncBlack, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        // ── History ───────────────────────────────────────────
+        if (allSessions.isNotEmpty()) {
+            HorizontalDivider(color = SyncMidGray, thickness = 0.5.dp)
+            TextButton(
+                onClick = { showHistory = !showHistory },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (showHistory)
+                        "Hide history"
+                    else
+                        "Show history (${allSessions.size} sessions)",
+                    color = SyncLightGray,
+                    fontSize = 11.sp
+                )
+            }
+
+            if (showHistory) {
+                allSessions.take(60).forEach { session ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onEditRequest(session) }
+                            .padding(vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = displayFmt.format(
+                                    java.util.Date(session.startTimestamp)
+                                ),
+                                fontSize = 11.sp,
+                                color = SyncWhite
+                            )
+                            Text(
+                                text = ExerciseSession.displayName(session.sessionType),
+                                fontSize = 10.sp,
+                                color = if (session.isHiit) SyncGreen else SyncLightGray
+                            )
+                        }
                         Text(
-                            text = "Total session length",
-                            fontSize = 9.sp,
-                            color = SyncMidGray
+                            text = if (session.durationMinutes > 0)
+                                "${session.durationMinutes} min" else "—",
+                            fontSize = 11.sp,
+                            color = SyncLightGray
                         )
                     }
-                    OutlinedTextField(
-                        value = durationInput,
-                        onValueChange = { durationInput = it },
-                        modifier = Modifier.width(100.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor   = SyncGreen,
-                            unfocusedBorderColor = SyncMidGray,
-                            focusedTextColor     = SyncWhite,
-                            unfocusedTextColor   = SyncWhite,
-                            cursorColor          = SyncGreen
-                        ),
-                        singleLine = true,
-                        suffix = {
-                            Text("min", color = SyncLightGray, fontSize = 11.sp)
-                        }
+                    HorizontalDivider(color = SyncMidGray, thickness = 0.5.dp)
+                }
+            }
+        }
+    }
+}
+
+// ── Exercise edit dialog ──────────────────────────────────────
+
+@Composable
+fun ExerciseEditDialog(
+    session: ExerciseSession,
+    onSave: (ExerciseSession) -> Unit,
+    onDelete: (Long) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val fmt = remember {
+        java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+    }
+
+    var selectedType by remember { mutableStateOf(session.sessionType) }
+    var durationInput by remember {
+        mutableStateOf(session.durationMinutes.toString())
+    }
+    var timestampInput by remember {
+        mutableStateOf(fmt.format(java.util.Date(session.startTimestamp)))
+    }
+    var confirmDelete by remember { mutableStateOf(false) }
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(SyncDarkSurface)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Edit Exercise Session",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = SyncGreen
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                ExerciseSession.ALL_TYPES.take(2).forEach { type ->
+                    ExerciseTypeChip(
+                        label = ExerciseSession.displayName(type),
+                        selected = selectedType == type,
+                        onClick = { selectedType = type },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                ExerciseSession.ALL_TYPES.drop(2).forEach { type ->
+                    ExerciseTypeChip(
+                        label = ExerciseSession.displayName(type),
+                        selected = selectedType == type,
+                        onClick = { selectedType = type },
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
 
-            // ── Actions ───────────────────────────────────────
+            OutlinedTextField(
+                value = durationInput,
+                onValueChange = { durationInput = it },
+                label = {
+                    Text("Duration (minutes)", color = SyncLightGray, fontSize = 11.sp)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor   = SyncGreen,
+                    unfocusedBorderColor = SyncMidGray,
+                    focusedTextColor     = SyncWhite,
+                    unfocusedTextColor   = SyncWhite,
+                    cursorColor          = SyncGreen
+                ),
+                singleLine = true
+            )
+
+            OutlinedTextField(
+                value = timestampInput,
+                onValueChange = { timestampInput = it },
+                label = {
+                    Text(
+                        "Start time (yyyy-MM-dd HH:mm)",
+                        color = SyncLightGray,
+                        fontSize = 11.sp
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor   = SyncGreen,
+                    unfocusedBorderColor = SyncMidGray,
+                    focusedTextColor     = SyncWhite,
+                    unfocusedTextColor   = SyncWhite,
+                    cursorColor          = SyncGreen
+                ),
+                singleLine = true
+            )
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                    border = ButtonDefaults.outlinedButtonBorder.copy(
+                        brush = SolidColor(SyncMidGray)
+                    )
+                ) {
+                    Text("Cancel", color = SyncLightGray)
+                }
                 Button(
                     onClick = {
                         val mins = if (selectedType == ExerciseSession.TYPE_REST) 0
-                        else durationInput.toIntOrNull() ?: 0
-                        onLog(selectedType, mins)
-                        expanded = false
+                        else durationInput.toIntOrNull()
+                            ?: session.durationMinutes
+                        val ts = try {
+                            fmt.parse(timestampInput)?.time ?: session.startTimestamp
+                        } catch (e: Exception) {
+                            session.startTimestamp
+                        }
+                        onSave(
+                            session.copy(
+                                sessionType     = selectedType,
+                                isHiit          = selectedType == ExerciseSession.TYPE_HIIT,
+                                durationMinutes = mins,
+                                startTimestamp  = ts
+                            )
+                        )
                     },
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = SyncGreen)
                 ) {
-                    Text(
-                        text = if (isLogged) "Update" else "Log Session",
-                        color = SyncBlack,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("Save", color = SyncBlack, fontWeight = FontWeight.Bold)
                 }
-                if (isLogged) {
+            }
+
+            HorizontalDivider(color = SyncMidGray, thickness = 0.5.dp)
+
+            if (!confirmDelete) {
+                TextButton(
+                    onClick = { confirmDelete = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Delete this session", color = SyncError, fontSize = 12.sp)
+                }
+            } else {
+                Text(
+                    text = "Delete permanently?",
+                    fontSize = 12.sp,
+                    color = SyncError
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     OutlinedButton(
-                        onClick = { todaySession?.let { onClear(it.id) } },
+                        onClick = { confirmDelete = false },
                         modifier = Modifier.weight(1f),
                         border = ButtonDefaults.outlinedButtonBorder.copy(
-                            brush = SolidColor(SyncLightGray)
+                            brush = SolidColor(SyncMidGray)
                         )
                     ) {
-                        Text("Clear", color = SyncLightGray)
+                        Text("Keep", color = SyncLightGray)
+                    }
+                    Button(
+                        onClick = { onDelete(session.id) },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = SyncError)
+                    ) {
+                        Text("Delete", color = SyncWhite, fontWeight = FontWeight.Bold)
                     }
                 }
             }

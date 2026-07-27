@@ -8,6 +8,7 @@ import com.synchronize.app.data.db.entity.MealEntry
 import com.synchronize.app.data.db.entity.SleepSession
 import kotlinx.coroutines.flow.Flow
 import com.synchronize.app.data.db.entity.ExerciseSession
+import com.synchronize.app.data.db.entity.DailyCovariate
 
 class SynchronizeRepository(private val db: SynchronizeDatabase) {
 
@@ -170,6 +171,32 @@ class SynchronizeRepository(private val db: SynchronizeDatabase) {
     suspend fun getExerciseCount(): Int =
         db.exerciseSessionDao().getCount()
 
+    suspend fun updateKetoneReading(reading: KetoneReading) =
+        db.ketoneReadingDao().update(reading)
+
+    suspend fun deleteKetoneReading(id: Long) =
+        db.ketoneReadingDao().deleteById(id)
+
+    // ── Daily covariates ──────────────────────────────────────
+
+    suspend fun insertDailyCovariate(covariate: DailyCovariate): Long =
+        db.dailyCovariateDao().insert(covariate)
+
+    suspend fun updateDailyCovariate(covariate: DailyCovariate) =
+        db.dailyCovariateDao().update(covariate)
+
+    fun getAllDailyCovariates(): Flow<List<DailyCovariate>> =
+        db.dailyCovariateDao().getAll()
+
+    suspend fun getCovariateForDate(dateKey: String): DailyCovariate? =
+        db.dailyCovariateDao().getForDate(dateKey)
+
+    suspend fun deleteDailyCovariate(id: Long) =
+        db.dailyCovariateDao().deleteById(id)
+
+    suspend fun getCovariateCount(): Int =
+        db.dailyCovariateDao().getCount()
+
     // ── Data quality summary ──────────────────────────────────
 
     suspend fun getDataQualitySummary(): Map<String, Int> = mapOf(
@@ -178,6 +205,7 @@ class SynchronizeRepository(private val db: SynchronizeDatabase) {
         "biosignals" to getBiosignalCount(),
         "sleep" to getSleepCount(),
         "meals" to getMealCount(),
-        "exercise" to getExerciseCount()
+        "exercise" to getExerciseCount(),
+        "covariates" to getCovariateCount()
     )
 }

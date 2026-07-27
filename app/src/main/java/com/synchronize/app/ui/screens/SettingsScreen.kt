@@ -140,6 +140,30 @@ fun SettingsScreen(viewModel: MainViewModel) {
                 )
             }
         }
+        SettingsSection(title = "Data Backup") {
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            var backupMsg by remember { mutableStateOf<String?>(null) }
+
+            Text(
+                text = "Back up the database daily. Files are saved to app storage " +
+                        "and survive rebuilds.",
+                fontSize = 11.sp,
+                color = SyncLightGray
+            )
+            Button(
+                onClick = {
+                    val path = viewModel.backupDatabase(ctx)
+                    backupMsg = if (path != null) "Backup saved ✓" else "Backup failed"
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = SyncGreen)
+            ) {
+                Text("Back Up Now", color = SyncBlack, fontWeight = FontWeight.Bold)
+            }
+            backupMsg?.let {
+                Text(text = it, fontSize = 11.sp, color = SyncGreen)
+            }
+        }
 
         // ── Danger zone ───────────────────────────────────────
         Column(

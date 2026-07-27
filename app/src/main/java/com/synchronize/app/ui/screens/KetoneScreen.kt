@@ -21,6 +21,7 @@ import com.synchronize.app.ui.viewmodel.MainViewModel
 import com.synchronize.app.util.Constants
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.foundation.clickable
 
 @Composable
 fun KetoneScreen(viewModel: MainViewModel) {
@@ -32,6 +33,7 @@ fun KetoneScreen(viewModel: MainViewModel) {
     var selectedContext by remember {
         mutableStateOf(Constants.CONTEXT_FASTING)
     }
+    var readingToEdit by remember { mutableStateOf<KetoneReading?>(null) }
     var manualBhb by remember { mutableStateOf("") }
     var manualGlucose by remember { mutableStateOf("") }
     var manualSystolic by remember { mutableStateOf("") }
@@ -42,7 +44,9 @@ fun KetoneScreen(viewModel: MainViewModel) {
             java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
                 .format(java.util.Date())
         )
+
     }
+    var showAllReadings by remember { mutableStateOf(false) }
 
     val contexts = listOf(
         Constants.CONTEXT_FASTING,
@@ -335,6 +339,8 @@ fun KetoneScreen(viewModel: MainViewModel) {
             }
         }
 
+
+
         // ── Reading history ───────────────────────────────────
         if (ketoneReadings.isNotEmpty()) {
             Column(
@@ -347,16 +353,52 @@ fun KetoneScreen(viewModel: MainViewModel) {
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "Recent Readings (${ketoneReadings.size} total)",
+                    text = "Readings (${ketoneReadings.size} total)",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = SyncGreen
                 )
-                ketoneReadings.take(10).forEach { reading ->
-                    KetoneReadingRow(reading = reading)
+
+                val visible = if (showAllReadings) ketoneReadings else ketoneReadings.take(10)
+
+                visible.forEach { reading ->
+                    KetoneReadingRow(
+                        reading = reading,
+                        onClick = { readingToEdit = reading }
+                    )
+                }
+
+                if (ketoneReadings.size > 10) {
+                    TextButton(
+                        onClick = { showAllReadings = !showAllReadings },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = if (showAllReadings)
+                                "Show recent only"
+                            else
+                                "Show all ${ketoneReadings.size} readings",
+                            color = SyncLightGray,
+                            fontSize = 11.sp
+                        )
+                    }
                 }
             }
         }
+    }
+    readingToEdit?.let { reading ->
+        KetoneEditDialog(
+            reading = reading,
+            onSave = {
+                viewModel.updateKetoneReading(it)
+                readingToEdit = null
+            },
+            onDelete = { id ->
+                viewModel.deleteKetoneReading(id)
+                readingToEdit = null
+            },
+            onDismiss = { readingToEdit = null }
+        )
     }
 }
 
@@ -401,12 +443,15 @@ fun ContextChip(
 // ── Reading history row ───────────────────────────────────────
 
 @Composable
-fun KetoneReadingRow(reading: KetoneReading) {
+fun KetoneReadingRow(reading: KetoneReading, onClick: () -> Unit = {}) {
     val formatter = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
     val time = formatter.format(Date(reading.deviceTimestamp))
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -437,6 +482,218 @@ fun KetoneReadingRow(reading: KetoneReading) {
         }
     }
     HorizontalDivider(color = SyncMidGray, thickness = 0.5.dp)
+}
+
+// ── Ketone edit dialog ────────────────────────────────────────
+
+@Composable
+fun KetoneEditDialog(
+    reading: KetoneReading,
+    onSave: (KetoneReading) -> Unit,
+    onDelete: (Long) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val fmt = remember {
+        java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+    }
+
+    var bhb by remember {
+        mutableStateOf(reading.betaHydroxybutyrate.toString())
+    }
+    var glucose by remember {
+        mutableStateOf(reading.glucoseMgDl?.toString() ?: "")
+    }
+    var context by remember {
+        mutableStateOf(reading.readingContext ?: Constants.CONTEXT_FASTING)
+    }
+    var dateTime by remember {
+        mutableStateOf(fmt.format(java.util.Date(reading.deviceTimestamp)))
+    }
+    var notes by remember { mutableStateOf(reading.notes ?: "") }
+    var confirmDelete by remember { mutableStateOf(false) }
+    var contextMenuOpen by remember { mutableStateOf(false) }
+
+    val contexts = listOf(
+        Constants.CONTEXT_FASTING,
+        Constants.CONTEXT_PRE_LUNCH,
+        Constants.CONTEXT_POST_LUNCH,
+        Constants.CONTEXT_PRE_DINNER,
+        Constants.CONTEXT_PRE_SLEEP
+    )
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(SyncDarkSurface)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Edit Ketone Reading",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = SyncGreen
+            )
+
+            // Context selector
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Context:", fontSize = 12.sp, color = SyncLightGray)
+                Box {
+                    OutlinedButton(
+                        onClick = { contextMenuOpen = true },
+                        border = ButtonDefaults.outlinedButtonBorder.copy(
+                            brush = androidx.compose.ui.graphics.SolidColor(SyncMidGray)
+                        )
+                    ) {
+                        Text(
+                            text = context.replace("_", " "),
+                            color = SyncWhite,
+                            fontSize = 12.sp
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = contextMenuOpen,
+                        onDismissRequest = { contextMenuOpen = false },
+                        containerColor = SyncDarkSurface
+                    ) {
+                        contexts.forEach { c ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        c.replace("_", " "),
+                                        color = SyncWhite,
+                                        fontSize = 12.sp
+                                    )
+                                },
+                                onClick = {
+                                    context = c
+                                    contextMenuOpen = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            KetoneEditField("BHB (mmol/L)", bhb) { bhb = it }
+            KetoneEditField("Paired glucose (mg/dL)", glucose) { glucose = it }
+            KetoneEditField("Time (yyyy-MM-dd HH:mm)", dateTime) { dateTime = it }
+            KetoneEditField("Notes (e.g. BP:118/76mmHg)", notes) { notes = it }
+
+            // Actions
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                    border = ButtonDefaults.outlinedButtonBorder.copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(SyncMidGray)
+                    )
+                ) {
+                    Text("Cancel", color = SyncLightGray)
+                }
+                Button(
+                    onClick = {
+                        val bhbVal = bhb.toDoubleOrNull()
+                            ?: reading.betaHydroxybutyrate
+                        val ts = try {
+                            fmt.parse(dateTime)?.time ?: reading.deviceTimestamp
+                        } catch (e: Exception) {
+                            reading.deviceTimestamp
+                        }
+                        onSave(
+                            reading.copy(
+                                betaHydroxybutyrate = bhbVal,
+                                glucoseMgDl         = glucose.toIntOrNull(),
+                                readingContext      = context,
+                                deviceTimestamp     = ts,
+                                notes               = notes.ifBlank { null }
+                            )
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = SyncGreen)
+                ) {
+                    Text("Save", color = SyncBlack, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            HorizontalDivider(color = SyncMidGray, thickness = 0.5.dp)
+
+            // Delete
+            if (!confirmDelete) {
+                TextButton(
+                    onClick = { confirmDelete = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Delete this reading", color = SyncError, fontSize = 12.sp)
+                }
+            } else {
+                Text(
+                    text = "Delete permanently? This cannot be undone.",
+                    fontSize = 12.sp,
+                    color = SyncError
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { confirmDelete = false },
+                        modifier = Modifier.weight(1f),
+                        border = ButtonDefaults.outlinedButtonBorder.copy(
+                            brush = androidx.compose.ui.graphics.SolidColor(SyncMidGray)
+                        )
+                    ) {
+                        Text("Keep", color = SyncLightGray)
+                    }
+                    Button(
+                        onClick = { onDelete(reading.id) },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = SyncError
+                        )
+                    ) {
+                        Text(
+                            "Delete",
+                            color = SyncWhite,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun KetoneEditField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label, color = SyncLightGray, fontSize = 11.sp) },
+        modifier = Modifier.fillMaxWidth(),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor   = SyncGreen,
+            unfocusedBorderColor = SyncMidGray,
+            focusedTextColor     = SyncWhite,
+            unfocusedTextColor   = SyncWhite,
+            cursorColor          = SyncGreen
+        ),
+        singleLine = true
+    )
 }
 
 // ── Helper functions ──────────────────────────────────────────

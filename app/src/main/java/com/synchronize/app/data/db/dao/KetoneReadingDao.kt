@@ -6,7 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.synchronize.app.data.db.entity.KetoneReading
 import kotlinx.coroutines.flow.Flow
-
+import androidx.room.Update
 @Dao
 interface KetoneReadingDao {
 
@@ -36,4 +36,9 @@ interface KetoneReadingDao {
 
     @Query("DELETE FROM ketone_readings")
     suspend fun deleteAll()
+    @Update
+    suspend fun update(reading: KetoneReading)
+
+    @Query("DELETE FROM ketone_readings WHERE id = :id")
+    suspend fun deleteById(id: Long)
 }

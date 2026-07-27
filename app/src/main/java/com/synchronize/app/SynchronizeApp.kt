@@ -27,7 +27,10 @@ class SynchronizeApp : Application() {
             val db = database
             Log.d("SynchronizeApp", "Database initialized: $db")
         } catch (e: Exception) {
-            Log.e("SynchronizeApp", "Fatal: database failed to initialize", e)
+            Log.e("SynchronizeApp",
+                "DATABASE INIT FAILED — likely schema version mismatch. " +
+                        "Do NOT clear app data; rebuild from correct source instead.", e)
+            throw e
         }
     }
 

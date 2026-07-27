@@ -24,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import com.synchronize.app.util.ReminderManager
 import kotlinx.coroutines.withContext
 import com.synchronize.app.data.db.entity.ExerciseSession
+import com.synchronize.app.data.db.entity.DailyCovariate
 
 class MainViewModel(private val repository: SynchronizeRepository) : ViewModel() {
 
@@ -90,7 +91,7 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
     }
 
     // ── Daily covariates ──────────────────────────────────────────
-    private val _caffeineMg = MutableStateFlow(400.0) // 46g grounds = ~400mg caffeine
+    private val _caffeineMg = MutableStateFlow(400.0)
     val caffeineMg: StateFlow<Double> = _caffeineMg
 
     private val _meditationAmMinutes = MutableStateFlow(0)
@@ -102,24 +103,73 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
     private val _covariatesLoggedToday = MutableStateFlow(false)
     val covariatesLoggedToday: StateFlow<Boolean> = _covariatesLoggedToday
 
+    private val _covariateDateKey = MutableStateFlow(todayKey())
+    val covariateDateKey: StateFlow<String> = _covariateDateKey
+
+    val allCovariates = repository.getAllDailyCovariates()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private fun todayKey(): String =
+        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+            .format(java.util.Date())
+
+    fun setCovariateDateKey(key: String) {
+        _covariateDateKey.value = key
+        viewModelScope.launch { loadCovariatesForDate(key) }
+    }
+
+    fun loadCovariatesForDate(dateKey: String) {
+        viewModelScope.launch {
+            val existing = repository.getCovariateForDate(dateKey)
+            if (existing != null) {
+                _caffeineMg.value = existing.caffeineMg
+                _meditationAmMinutes.value = existing.meditationAmMinutes
+                _meditationPmMinutes.value = existing.meditationPmMinutes
+                _covariatesLoggedToday.value = true
+            } else {
+                _caffeineMg.value = 400.0
+                _meditationAmMinutes.value = 0
+                _meditationPmMinutes.value = 0
+                _covariatesLoggedToday.value = false
+            }
+        }
+    }
+
     fun logDailyCovariates(
         caffeineMg: Double,
         meditationAm: Int,
-        meditationPm: Int
+        meditationPm: Int,
+        dateKey: String = _covariateDateKey.value
     ) {
-        _caffeineMg.value = caffeineMg
-        _meditationAmMinutes.value = meditationAm
-        _meditationPmMinutes.value = meditationPm
-        _covariatesLoggedToday.value = true
-        android.util.Log.d("MainViewModel",
-            "Daily covariates logged: ${caffeineMg}mg caffeine, " +
-                    "AM ${meditationAm}min, PM ${meditationPm}min")
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val existing = repository.getCovariateForDate(dateKey)
+            val record = DailyCovariate(
+                id                  = existing?.id ?: 0,
+                subjectId           = Constants.SUBJECT_ID,
+                dateKey             = dateKey,
+                deviceTimestamp     = existing?.deviceTimestamp ?: now,
+                receiveTimestamp    = now,
+                caffeineMg          = caffeineMg,
+                meditationAmMinutes = meditationAm,
+                meditationPmMinutes = meditationPm
+            )
+            repository.insertDailyCovariate(record)
+
+            _caffeineMg.value = caffeineMg
+            _meditationAmMinutes.value = meditationAm
+            _meditationPmMinutes.value = meditationPm
+            _covariatesLoggedToday.value = true
+            refreshDataQuality()
+        }
     }
 
-    fun resetDailyCovariates() {
-        _covariatesLoggedToday.value = false
-        _meditationAmMinutes.value = 0
-        _meditationPmMinutes.value = 0
+    fun deleteCovariate(id: Long) {
+        viewModelScope.launch {
+            repository.deleteDailyCovariate(id)
+            loadCovariatesForDate(_covariateDateKey.value)
+            refreshDataQuality()
+        }
     }
 
     // ── Exercise sessions ─────────────────────────────────────────
@@ -171,6 +221,14 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
     fun deleteExerciseSession(id: Long) {
         viewModelScope.launch {
             repository.deleteExerciseSession(id)
+            refreshTodayExercise()
+            refreshDataQuality()
+        }
+    }
+
+    fun updateExerciseSession(session: ExerciseSession) {
+        viewModelScope.launch {
+            repository.updateExerciseSession(session)
             refreshTodayExercise()
             refreshDataQuality()
         }
@@ -376,6 +434,7 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
     // ── Init ──────────────────────────────────────────────────
 
     init {
+        loadCovariatesForDate(todayKey())
         refreshLatestReadings()
         refreshDataQuality()
         refreshTodayExercise()
@@ -425,6 +484,21 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
             _latestKetone.value = reading
             refreshDataQuality()
             //broadcastAllData()  // push to web dashboard immediately
+        }
+    }
+    fun updateKetoneReading(reading: KetoneReading) {
+        viewModelScope.launch {
+            repository.updateKetoneReading(reading)
+            refreshLatestReadings()
+            refreshDataQuality()
+        }
+    }
+
+    fun deleteKetoneReading(id: Long) {
+        viewModelScope.launch {
+            repository.deleteKetoneReading(id)
+            refreshLatestReadings()
+            refreshDataQuality()
         }
     }
 
@@ -493,6 +567,27 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
 
     fun clearVoiceTranscription() {
         _voiceTranscription.value = null
+    }
+
+    // -- Data Backup function
+
+    fun backupDatabase(context: android.content.Context): String? {
+        return try {
+            val dbFile = context.getDatabasePath("synchronize_db")
+            val backupDir = java.io.File(
+                context.getExternalFilesDir(null), "backups"
+            ).apply { mkdirs() }
+            val stamp = java.text.SimpleDateFormat(
+                "yyyyMMdd_HHmm", java.util.Locale.US
+            ).format(java.util.Date())
+            val dest = java.io.File(backupDir, "synchronize_db_$stamp")
+            dbFile.copyTo(dest, overwrite = true)
+            android.util.Log.d("Backup", "Saved: ${dest.absolutePath}")
+            dest.absolutePath
+        } catch (e: Exception) {
+            android.util.Log.e("Backup", "Backup failed", e)
+            null
+        }
     }
 
 
