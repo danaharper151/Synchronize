@@ -108,10 +108,12 @@ fun DashboardScreen(viewModel: MainViewModel) {
                             )
                         )
                     }
+                    viewModel.clearVoiceState()          // ← consume
                 }
                 is VoiceInputManager.VoiceState.Error -> {
                     viewModel.setVoiceTranscription("Error: ${voiceState.message}")
                     viewModel.setListening(false)
+                    viewModel.clearVoiceState()          // ← consume
                 }
                 is VoiceInputManager.VoiceState.Listening -> {
                     viewModel.setVoiceTranscription("Listening...")

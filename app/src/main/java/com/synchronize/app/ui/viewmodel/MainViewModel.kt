@@ -519,18 +519,21 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
     // ── Meal entry functions ──────────────────────────────────
 
     fun setPendingMealEntry(entry: MealEntry) {
+        android.util.Log.d("MealDebug", "setPendingMealEntry called: ${entry.calories} cal")
         _pendingMealEntry.value = entry
     }
 
     fun confirmPendingMealEntry() {
         viewModelScope.launch {
             val entry = _pendingMealEntry.value ?: return@launch
-            _pendingMealEntry.value = null          // clear FIRST
+            android.util.Log.d("MealDebug", "confirm: clearing pending")
+            _pendingMealEntry.value = null
             _voiceTranscription.value = null
             val id = repository.insertMealEntry(entry)
             repository.confirmMealEntry(id)
             _latestMeal.value = entry
             refreshDataQuality()
+            android.util.Log.d("MealDebug", "confirm: done, pending=${_pendingMealEntry.value}")
         }
     }
 
@@ -551,6 +554,7 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
     }
 
     fun discardPendingMealEntry() {
+        android.util.Log.d("MealDebug", "discard called")
         _pendingMealEntry.value = null
         _voiceTranscription.value = null
     }
@@ -567,6 +571,10 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
 
     fun clearVoiceTranscription() {
         _voiceTranscription.value = null
+    }
+    fun clearVoiceState() {
+        voiceInputManager?.reset()
+        _voiceState.value = VoiceInputManager.VoiceState.Idle
     }
 
     // -- Data Backup function
