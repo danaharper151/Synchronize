@@ -581,6 +581,11 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
 
     fun backupDatabase(context: android.content.Context): String? {
         return try {
+            // Force WAL contents into the main database file first
+            val db = com.synchronize.app.SynchronizeApp.instance.database
+            db.openHelper.writableDatabase
+                .query("PRAGMA wal_checkpoint(FULL)").use { it.moveToFirst() }
+
             val dbFile = context.getDatabasePath("synchronize_db")
             val backupDir = java.io.File(
                 context.getExternalFilesDir(null), "backups"
