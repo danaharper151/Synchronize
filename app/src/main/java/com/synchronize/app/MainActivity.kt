@@ -137,6 +137,14 @@ class MainActivity : FragmentActivity() {
         biometricAuthManager = BiometricAuthManager(this)
         authService = AuthorizationService(this)
         dexcomAuthManager = DexcomAuthManager(this)
+        lifecycleScope.launch {
+            if (dexcomAuthManager.isAuthenticated()) {
+                viewModel.setDexcomConnected(true)
+                android.util.Log.d("DexcomAuth", "Restored existing Dexcom connection on launch")
+            } else {
+                android.util.Log.d("DexcomAuth", "No existing Dexcom token found on launch")
+            }
+        }
 
         requestAllPermissions()
 

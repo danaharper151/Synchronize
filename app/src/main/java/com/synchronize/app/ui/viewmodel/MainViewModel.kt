@@ -602,6 +602,29 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
             null
         }
     }
+    fun syncDexcomFullHistory(context: android.content.Context) {
+        viewModelScope.launch {
+            try {
+                val syncManager = com.synchronize.app.util.DexcomSyncManager(context, repository)
+                android.util.Log.d("DexcomSync", "Starting full history sync...")
+                val result = syncManager.syncFullHistory()
+                if (result.isSuccess) {
+                    val newCount = result.getOrNull() ?: 0
+                    val total = repository.getGlucoseCount()
+                    android.util.Log.d("DexcomSync",
+                        "Sync successful — $newCount readings processed, $total total in database")
+                    _glucoseSyncCount.value = total
+                    refreshLatestReadings()
+                    refreshDataQuality()
+                } else {
+                    android.util.Log.e("DexcomSync",
+                        "Sync failed: ${result.exceptionOrNull()?.message}")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("DexcomSync", "Exception during sync", e)
+            }
+        }
+    }
 
 
     // ── ViewModelFactory ──────────────────────────────────────

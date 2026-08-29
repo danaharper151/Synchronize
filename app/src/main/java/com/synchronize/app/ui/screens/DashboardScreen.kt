@@ -252,7 +252,7 @@ fun DashboardScreen(viewModel: MainViewModel) {
             isConnected = isDexcomConnected,
             glucoseCount = glucoseSyncCount,
             onConnectClick = { activity.launchDexcomAuth() },
-            onSyncClick = { viewModel.refreshLatestReadings() }
+            onSyncClick = { viewModel.syncDexcomFullHistory(context) }
         )
 
         // ── Keto-Mojo card ────────────────────────────────────
