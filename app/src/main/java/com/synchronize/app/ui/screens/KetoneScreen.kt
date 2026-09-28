@@ -22,7 +22,7 @@ import com.synchronize.app.util.Constants
 import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.foundation.clickable
-
+import androidx.compose.runtime.saveable.rememberSaveable
 @Composable
 fun KetoneScreen(viewModel: MainViewModel) {
 
@@ -30,23 +30,24 @@ fun KetoneScreen(viewModel: MainViewModel) {
     val latestKetone by viewModel.latestKetone.collectAsState()
 
     // Context selector state
-    var selectedContext by remember {
+    var selectedContext by rememberSaveable {
         mutableStateOf(Constants.CONTEXT_FASTING)
     }
-    var readingToEdit by remember { mutableStateOf<KetoneReading?>(null) }
-    var manualBhb by remember { mutableStateOf("") }
-    var manualGlucose by remember { mutableStateOf("") }
-    var manualSystolic by remember { mutableStateOf("") }
-    var manualDiastolic by remember { mutableStateOf("") }
-    var showConfirmation by remember { mutableStateOf(false) }
-    var manualDateTime by remember {
+    var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val readingToEdit = editingId?.let { id -> ketoneReadings.find { it.id == id } }
+    var manualBhb by rememberSaveable { mutableStateOf("") }
+    var manualGlucose by rememberSaveable { mutableStateOf("") }
+    var manualSystolic by rememberSaveable { mutableStateOf("") }
+    var manualDiastolic by rememberSaveable { mutableStateOf("") }
+    var showConfirmation by rememberSaveable { mutableStateOf(false) }
+    var manualDateTime by rememberSaveable {
         mutableStateOf(
             java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
                 .format(java.util.Date())
         )
-
     }
-    var showAllReadings by remember { mutableStateOf(false) }
+    var showAllReadings by rememberSaveable { mutableStateOf(false) }
+
 
     val contexts = listOf(
         Constants.CONTEXT_FASTING,
@@ -364,7 +365,7 @@ fun KetoneScreen(viewModel: MainViewModel) {
                 visible.forEach { reading ->
                     KetoneReadingRow(
                         reading = reading,
-                        onClick = { readingToEdit = reading }
+                        onClick = { editingId = reading.id }
                     )
                 }
 
@@ -391,13 +392,13 @@ fun KetoneScreen(viewModel: MainViewModel) {
             reading = reading,
             onSave = {
                 viewModel.updateKetoneReading(it)
-                readingToEdit = null
+                editingId = null
             },
             onDelete = { id ->
                 viewModel.deleteKetoneReading(id)
-                readingToEdit = null
+                editingId = null
             },
-            onDismiss = { readingToEdit = null }
+            onDismiss = { editingId = null }
         )
     }
 }
@@ -497,21 +498,21 @@ fun KetoneEditDialog(
         java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
     }
 
-    var bhb by remember {
+    var bhb by rememberSaveable {
         mutableStateOf(reading.betaHydroxybutyrate.toString())
     }
-    var glucose by remember {
+    var glucose by rememberSaveable {
         mutableStateOf(reading.glucoseMgDl?.toString() ?: "")
     }
-    var context by remember {
+    var context by rememberSaveable {
         mutableStateOf(reading.readingContext ?: Constants.CONTEXT_FASTING)
     }
-    var dateTime by remember {
+    var dateTime by rememberSaveable {
         mutableStateOf(fmt.format(java.util.Date(reading.deviceTimestamp)))
     }
-    var notes by remember { mutableStateOf(reading.notes ?: "") }
-    var confirmDelete by remember { mutableStateOf(false) }
-    var contextMenuOpen by remember { mutableStateOf(false) }
+    var notes by rememberSaveable { mutableStateOf(reading.notes ?: "") }
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    var contextMenuOpen by rememberSaveable { mutableStateOf(false) }
 
     val contexts = listOf(
         Constants.CONTEXT_FASTING,

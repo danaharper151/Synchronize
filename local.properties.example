@@ -1,0 +1,9 @@
+# Copy this file to local.properties and fill in your own credentials.
+# local.properties is gitignored and must never be committed.
+
+# Dexcom Developer Portal — https://developer.dexcom.com
+DEXCOM_CLIENT_ID=
+DEXCOM_CLIENT_SECRET=
+
+# SQLCipher database passphrase — any long random string
+DB_PASSPHRASE=

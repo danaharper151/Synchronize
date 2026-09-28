@@ -1,14 +1,19 @@
 package com.synchronize.app.util
+import com.synchronize.app.BuildConfig
+
 
 object Constants {
 
     // ── Dexcom OAuth ──────────────────────────────────────────
-    // Replace DEXCOM_CLIENT_ID with your actual Client ID from developer.dexcom.com
-    const val DEXCOM_CLIENT_ID     = "REDACTED"
+
+
     const val DEXCOM_REDIRECT_URI = "https://danaharper151.github.io/synchronize-oauth/"
     const val DEXCOM_APP_REDIRECT_URI = "com.synchronize.app://oauth/callback"
     const val DEXCOM_SCOPE         = "offline_access"
-    const val DEXCOM_CLIENT_SECRET = "REDACTED"
+    val DEXCOM_CLIENT_ID     = BuildConfig.DEXCOM_CLIENT_ID
+    val DEXCOM_CLIENT_SECRET = BuildConfig.DEXCOM_CLIENT_SECRET
+    val DB_PASSPHRASE        = BuildConfig.DB_PASSPHRASE
+
 
     // Sandbox (development) — switch to PROD_BASE_URL when ready for real data
     const val DEXCOM_SANDBOX_BASE_URL = "https://sandbox-api.dexcom.com/"
@@ -34,7 +39,7 @@ object Constants {
     const val DEXCOM_POLL_INTERVAL_MS = 5 * 60 * 1000L  // 5 minutes
 
     // ── Database ──────────────────────────────────────────────
-    const val DB_PASSPHRASE = "REDACTED"  // dev only
+
 
     // ── Subject ───────────────────────────────────────────────
     const val SUBJECT_ID = "subject_001"

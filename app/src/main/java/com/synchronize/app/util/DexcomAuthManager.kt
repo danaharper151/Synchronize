@@ -116,69 +116,59 @@ class DexcomAuthManager(private val context: Context) {
     }
     // ── Refresh access token ──────────────────────────────────
 
-    suspend fun refreshAccessToken(
-        authService: AuthorizationService
-    ): Result<Unit> {
+    /**
+     * Refreshes the access token via Retrofit rather than AppAuth's
+     * performTokenRequest. AppAuth's response parser throws on Dexcom's error
+     * payload shape and obscures the server's message; Retrofit's HttpException
+     * surfaces it. This mirrors the code-exchange path above.
+     *
+     * Dexcom rotates the refresh token on each use and returns a new one. It must
+     * be persisted or the following refresh will fail.
+     */
+    suspend fun refreshAccessToken(): Result<Unit> {
         return try {
-            val refreshToken = getRefreshToken()
+            val stored = getRefreshToken()
                 ?: return Result.failure(Exception("No refresh token stored"))
 
-            val clientAuth: ClientAuthentication = ClientSecretPost(
-                Constants.DEXCOM_CLIENT_SECRET
+            val r = DexcomRetrofitClient.instance.refreshToken(
+                clientId     = Constants.DEXCOM_CLIENT_ID,
+                clientSecret = Constants.DEXCOM_CLIENT_SECRET,
+                refreshToken = stored
             )
-
-            val tokenRequest = TokenRequest.Builder(
-                serviceConfig,
-                Constants.DEXCOM_CLIENT_ID
-            )
-                .setGrantType(GrantTypeValues.REFRESH_TOKEN)
-                .setRefreshToken(refreshToken)
-                .setRedirectUri(Uri.parse(Constants.DEXCOM_REDIRECT_URI))
-                .build()
-
-            val tokenResponse = kotlinx.coroutines.suspendCancellableCoroutine { cont ->
-                authService.performTokenRequest(tokenRequest, clientAuth) { response, ex ->
-                    if (response != null) {
-                        cont.resume(response) {}
-                    } else {
-                        cont.resumeWithException(
-                            ex ?: Exception("Token refresh failed")
-                        )
-                    }
-                }
-            }
 
             context.dexcomDataStore.edit { prefs ->
-                prefs[DexcomPrefKeys.ACCESS_TOKEN]  = tokenResponse.accessToken ?: ""
-                prefs[DexcomPrefKeys.REFRESH_TOKEN] = tokenResponse.refreshToken
-                    ?: refreshToken
-                prefs[DexcomPrefKeys.TOKEN_EXPIRY]  = tokenResponse.accessTokenExpirationTime
-                    ?: (System.currentTimeMillis() + 3600000L)
+                prefs[DexcomPrefKeys.ACCESS_TOKEN]  = r.accessToken
+                prefs[DexcomPrefKeys.REFRESH_TOKEN] = r.refreshToken
+                prefs[DexcomPrefKeys.TOKEN_EXPIRY]  =
+                    System.currentTimeMillis() + (r.expiresIn * 1000L)
             }
 
-            Log.d(TAG, "Token refresh successful")
+            Log.d(TAG, "Token refreshed; expires in ${r.expiresIn}s")
             Result.success(Unit)
 
+        } catch (e: retrofit2.HttpException) {
+            val body = e.response()?.errorBody()?.string()
+            Log.e(TAG, "Refresh failed HTTP ${e.code()} — $body")
+            Result.failure(Exception("HTTP ${e.code()}: $body"))
         } catch (e: Exception) {
-            Log.e(TAG, "Token refresh failed", e)
+            Log.e(TAG, "Refresh failed", e)
             Result.failure(e)
         }
     }
 
-    // ── Get valid access token ────────────────────────────────
-
-    suspend fun getValidAccessToken(
-        authService: AuthorizationService
-    ): String? {
-        val expiry = getTokenExpiry()
-        val now = System.currentTimeMillis()
-        return if (expiry != null && now < expiry - 60_000) {
-            getAccessToken()
-        } else {
-            val result = refreshAccessToken(authService)
-            if (result.isSuccess) getAccessToken() else null
-        }
+    suspend fun getValidAccessToken(): String? {
+        val expiry = getTokenExpiry() ?: return null
+        if (System.currentTimeMillis() < expiry - 300_000) return getAccessToken()
+        return if (refreshAccessToken().isSuccess) getAccessToken() else null
     }
+
+    /** Credentials are stored. Does not mean the session is usable. */
+    suspend fun hasStoredCredentials(): Boolean = getRefreshToken() != null
+
+    /** A usable session: valid access token, or a refresh token that yields one. */
+    suspend fun isAuthenticated(): Boolean = getValidAccessToken() != null
+
+
 
     // ── DataStore accessors ───────────────────────────────────
 
@@ -204,12 +194,7 @@ class DexcomAuthManager(private val context: Context) {
         }
     }
 
-    suspend fun isAuthenticated(): Boolean = getAccessToken() != null
 
-    val isAuthenticatedFlow: Flow<Boolean> =
-        context.dexcomDataStore.data.map {
-            !it[DexcomPrefKeys.ACCESS_TOKEN].isNullOrBlank()
-        }
 
     suspend fun clearTokens() {
         context.dexcomDataStore.edit { it.clear() }

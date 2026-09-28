@@ -49,8 +49,8 @@ class DexcomSyncManager(
 
     suspend fun syncLatestEgvs(): Result<Int> {
         return try {
-            val token = authManager.getAccessToken()
-                ?: return Result.failure(Exception("Not authenticated"))
+            val token = authManager.getValidAccessToken()
+                ?: return Result.failure(Exception("Not authenticated — reauthorization required"))
 
             // Use last sync time or default to 3 hours ago
             val lastSync = authManager.getLastSyncTime()
@@ -91,7 +91,12 @@ class DexcomSyncManager(
 
             Result.success(readings.size)
 
+        } catch (e: retrofit2.HttpException) {
+            val body = e.response()?.errorBody()?.string()
+            android.util.Log.e("DexcomSync", "HTTP ${e.code()} — $body")
+            Result.failure(Exception("HTTP ${e.code()}: $body"))
         } catch (e: Exception) {
+            android.util.Log.e("DexcomSync", "Sync failed", e)
             Result.failure(e)
         }
     }
@@ -100,8 +105,8 @@ class DexcomSyncManager(
 
     suspend fun syncFullHistory(): Result<Int> {
         return try {
-            val token = authManager.getAccessToken()
-                ?: return Result.failure(Exception("Not authenticated"))
+            val token = authManager.getValidAccessToken()
+                ?: return Result.failure(Exception("Not authenticated — reauthorization required"))
 
             // Get available data range first
             val rangeResponse = api.getDataRange("Bearer $token")
@@ -110,6 +115,8 @@ class DexcomSyncManager(
                     Instant.now().minusSeconds(90 * 24 * 60 * 60L)
                 )
             val endDate = isoFormatter.format(Instant.now())
+
+            android.util.Log.d("DexcomSync", "range $startDate -> $endDate")
 
             val response = api.getEgvs(
                 authorization = "Bearer $token",
@@ -140,10 +147,16 @@ class DexcomSyncManager(
 
             Result.success(readings.size)
 
+        } catch (e: retrofit2.HttpException) {
+            val body = e.response()?.errorBody()?.string()
+            android.util.Log.e("DexcomSync", "HTTP ${e.code()} — $body")
+            Result.failure(Exception("HTTP ${e.code()}: $body"))
         } catch (e: Exception) {
+            android.util.Log.e("DexcomSync", "Sync failed", e)
             Result.failure(e)
         }
     }
+
 
     // ── Helper: parse ISO 8601 string to epoch ms ─────────────
 

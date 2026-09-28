@@ -35,7 +35,7 @@ interface DexcomApiService {
         @Field("client_secret") clientSecret: String,
         @Field("refresh_token") refreshToken: String,
         @Field("grant_type")    grantType: String = "refresh_token",
-        @Field("redirect_uri")  redirectUri: String
+
     ): DexcomTokenResponse
 
     // Fetch EGV readings in a time range
@@ -63,8 +63,12 @@ interface DexcomApiService {
 
 object DexcomRetrofitClient {
 
+    // BASIC rather than BODY: at BODY level the interceptor logs the full
+    // request and response, including the bearer token and client secret.
+    // redactHeader additionally masks Authorization on every request.
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+        level = HttpLoggingInterceptor.Level.BASIC
+        redactHeader("Authorization")
     }
 
     private val okHttpClient = OkHttpClient.Builder()

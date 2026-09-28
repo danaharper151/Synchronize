@@ -1,3 +1,17 @@
+import java.util.Properties
+import java.io.FileInputStream
+
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) load(FileInputStream(f))
+}
+
+fun secret(key: String): String =
+    localProps.getProperty(key)
+        ?: throw GradleException(
+            "Missing '$key' in local.properties. " +
+                    "Copy local.properties.example and fill in your credentials."
+        )
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -16,6 +30,13 @@ android {
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["appAuthRedirectScheme"] = "com.synchronize.app"
+        buildConfigField("String", "DEXCOM_CLIENT_ID",
+            "\"${secret("DEXCOM_CLIENT_ID")}\"")
+        buildConfigField("String", "DEXCOM_CLIENT_SECRET",
+            "\"${secret("DEXCOM_CLIENT_SECRET")}\"")
+        buildConfigField("String", "DB_PASSPHRASE",
+            "\"${secret("DB_PASSPHRASE")}\"")
+
 
     }
 
@@ -37,6 +58,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
 

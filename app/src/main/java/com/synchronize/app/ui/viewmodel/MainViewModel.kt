@@ -25,6 +25,7 @@ import com.synchronize.app.util.ReminderManager
 import kotlinx.coroutines.withContext
 import com.synchronize.app.data.db.entity.ExerciseSession
 import com.synchronize.app.data.db.entity.DailyCovariate
+import kotlinx.coroutines.flow.asStateFlow
 
 class MainViewModel(private val repository: SynchronizeRepository) : ViewModel() {
 
@@ -68,6 +69,9 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
         VoiceInputManager.VoiceState.Idle
     )
     val voiceState: StateFlow<VoiceInputManager.VoiceState> = _voiceState
+    private val _isUnlocked = MutableStateFlow(false)
+    val isUnlocked: StateFlow<Boolean> = _isUnlocked.asStateFlow()
+    fun setUnlocked(value: Boolean) { _isUnlocked.value = value }
 
     fun initVoiceInput(context: android.content.Context) {
         if (voiceInputManager == null) {

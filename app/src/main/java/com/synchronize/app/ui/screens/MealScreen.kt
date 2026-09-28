@@ -23,13 +23,16 @@ import com.synchronize.app.ui.theme.*
 import com.synchronize.app.ui.viewmodel.MainViewModel
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.runtime.saveable.rememberSaveable
 
 @Composable
 fun MealScreen(viewModel: MainViewModel) {
 
     val mealEntries by viewModel.allMealEntries.collectAsState()
-    var entryToEdit by remember { mutableStateOf<MealEntry?>(null) }
-    var entryToDelete by remember { mutableStateOf<MealEntry?>(null) }
+    var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var deletingId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val entryToEdit = editingId?.let { id -> mealEntries.find { it.id == id } }
+    val entryToDelete = deletingId?.let { id -> mealEntries.find { it.id == id } }
 
     Column(
         modifier = Modifier
@@ -150,8 +153,8 @@ fun MealScreen(viewModel: MainViewModel) {
                 mealEntries.forEach { entry ->
                     MealEntryRow(
                         entry = entry,
-                        onEdit = { entryToEdit = entry },
-                        onDelete = { entryToDelete = entry }
+                        onEdit = { editingId = entry.id },
+                        onDelete = { deletingId = entry.id }
                     )
                 }
             }
@@ -164,16 +167,16 @@ fun MealScreen(viewModel: MainViewModel) {
             entry = entry,
             onSave = { updated ->
                 viewModel.updateMealEntry(updated)
-                entryToEdit = null
+                editingId = null
             },
-            onDismiss = { entryToEdit = null }
+            onDismiss = { editingId = null }
         )
     }
 
     // ── Delete confirmation dialog ────────────────────────────
     entryToDelete?.let { entry ->
         AlertDialog(
-            onDismissRequest = { entryToDelete = null },
+            onDismissRequest = { deletingId = null },
             containerColor = SyncDarkSurface,
             title = {
                 Text("Delete Entry?", color = SyncWhite, fontWeight = FontWeight.Bold)
@@ -192,7 +195,7 @@ fun MealScreen(viewModel: MainViewModel) {
                 Button(
                     onClick = {
                         viewModel.deleteMealEntry(entry.id)
-                        entryToDelete = null
+                        deletingId = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = SyncError)
                 ) {
@@ -201,7 +204,7 @@ fun MealScreen(viewModel: MainViewModel) {
             },
             dismissButton = {
                 OutlinedButton(
-                    onClick = { entryToDelete = null },
+                    onClick = { deletingId = null },
                     border = ButtonDefaults.outlinedButtonBorder.copy(
                         brush = androidx.compose.ui.graphics.SolidColor(SyncMidGray)
                     )
@@ -221,7 +224,7 @@ fun MealEntryRow(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
+    var menuExpanded by rememberSaveable { mutableStateOf(false) }
     val formatter = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -318,21 +321,24 @@ fun MealEditDialog(
     onSave: (MealEntry) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var calories  by remember { mutableStateOf(entry.calories.toString()) }
-    var fat       by remember { mutableStateOf(entry.fatGrams.toString()) }
-    var protein   by remember { mutableStateOf(entry.proteinGrams.toString()) }
-    var netCarbs  by remember { mutableStateOf(entry.netCarbGrams.toString()) }
-    var fiber     by remember { mutableStateOf(entry.fiberGrams.toString()) }
-    var label     by remember { mutableStateOf(entry.mealLabel ?: "MEAL") }
-
+    var calories by rememberSaveable { mutableStateOf(entry.calories.toString()) }
+    var fat by rememberSaveable { mutableStateOf(entry.fatGrams.toString()) }
+    var protein by rememberSaveable { mutableStateOf(entry.proteinGrams.toString()) }
+    var netCarbs by rememberSaveable { mutableStateOf(entry.netCarbGrams.toString()) }
+    var fiber by rememberSaveable { mutableStateOf(entry.fiberGrams.toString()) }
+    var label by rememberSaveable { mutableStateOf(entry.mealLabel ?: "MEAL") }
     // Simple date/time editing via timestamp offset
     val formatter = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-    var dateTimeStr by remember {
+    var dateTimeStr by rememberSaveable {
         mutableStateOf(formatter.format(Date(entry.deviceTimestamp)))
     }
+    var labelMenuExpanded by rememberSaveable { mutableStateOf(false) }
+
+
+
 
     val labels = listOf("BREAKFAST", "LUNCH", "DINNER", "SNACK", "MEAL")
-    var labelMenuExpanded by remember { mutableStateOf(false) }
+
 
     Dialog(onDismissRequest = onDismiss) {
         Column(

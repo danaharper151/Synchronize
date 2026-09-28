@@ -33,10 +33,11 @@ import com.synchronize.app.util.VoiceInputManager
 import java.time.Instant
 import kotlinx.coroutines.launch
 import com.synchronize.app.MainActivity
-import androidx.compose.runtime.DisposableEffect
+
 import com.synchronize.app.data.db.entity.ExerciseSession
 import androidx.compose.foundation.clickable
 import com.synchronize.app.data.db.entity.DailyCovariate
+import androidx.compose.runtime.saveable.rememberSaveable
 
 @Composable
 fun DashboardScreen(viewModel: MainViewModel) {
@@ -64,7 +65,10 @@ fun DashboardScreen(viewModel: MainViewModel) {
     val covariatesLogged  by viewModel.covariatesLoggedToday.collectAsState()
     val todayExercise by viewModel.todayExercise.collectAsState()
     val allExerciseSessions by viewModel.allExerciseSessions.collectAsState()
-    var exerciseToEdit by remember { mutableStateOf<ExerciseSession?>(null) }
+    var editingExerciseId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val exerciseToEdit = editingExerciseId?.let { id ->
+        allExerciseSessions.find { it.id == id }
+    }
     val covariateDateKey by viewModel.covariateDateKey.collectAsState()
     val allCovariates by viewModel.allCovariates.collectAsState()
 
@@ -122,10 +126,6 @@ fun DashboardScreen(viewModel: MainViewModel) {
             }
         }
     }
-    DisposableEffect(Unit) {
-        onDispose { viewModel.discardPendingMealEntry() }
-    }
-
 
 
     // ── Main dashboard ────────────────────────────────────────
@@ -239,7 +239,7 @@ fun DashboardScreen(viewModel: MainViewModel) {
             onLog = { type, mins, ts ->
                 viewModel.logExerciseSession(type, mins, ts)
             },
-            onEditRequest = { exerciseToEdit = it }
+            onEditRequest = { editingExerciseId = it.id }
         )
 
         // ── Data quality card ─────────────────────────────────
@@ -299,13 +299,13 @@ fun DashboardScreen(viewModel: MainViewModel) {
             session = session,
             onSave = {
                 viewModel.updateExerciseSession(it)
-                exerciseToEdit = null
+                editingExerciseId = null
             },
             onDelete = { id ->
                 viewModel.deleteExerciseSession(id)
-                exerciseToEdit = null
+                editingExerciseId = null
             },
-            onDismiss = { exerciseToEdit = null }
+            onDismiss = { editingExerciseId = null }
         )
     }
 }
@@ -532,18 +532,18 @@ fun DailyCovariatesCard(
     onLog: (caffeine: Double, am: Int, pm: Int) -> Unit,
     onDelete: (Long) -> Unit
 ) {
-    var caffeineInput by remember(caffeineMg) {
+    var caffeineInput by rememberSaveable(caffeineMg) {
         mutableStateOf(caffeineMg.toInt().toString())
     }
-    var amInput by remember(meditationAm) {
+    var amInput by rememberSaveable(meditationAm) {
         mutableStateOf(if (meditationAm > 0) meditationAm.toString() else "")
     }
-    var pmInput by remember(meditationPm) {
+    var pmInput by rememberSaveable(meditationPm) {
         mutableStateOf(if (meditationPm > 0) meditationPm.toString() else "")
     }
-    var dateInput by remember(dateKey) { mutableStateOf(dateKey) }
-    var expanded by remember { mutableStateOf(!isLogged) }
-    var showHistory by remember { mutableStateOf(false) }
+    var dateInput by rememberSaveable(dateKey) { mutableStateOf(dateKey) }
+    var expanded by rememberSaveable { mutableStateOf(!isLogged) }
+    var showHistory by rememberSaveable { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -783,13 +783,13 @@ fun ExerciseCard(
         java.text.SimpleDateFormat("MMM d, h:mm a", java.util.Locale.getDefault())
     }
 
-    var selectedType by remember { mutableStateOf(ExerciseSession.TYPE_HIIT) }
-    var durationInput by remember { mutableStateOf("60") }
-    var timestampInput by remember {
+    var selectedType by rememberSaveable { mutableStateOf(ExerciseSession.TYPE_HIIT) }
+    var durationInput by rememberSaveable { mutableStateOf("60") }
+    var timestampInput by rememberSaveable {
         mutableStateOf(fmt.format(java.util.Date()))
     }
-    var expanded by remember { mutableStateOf(todaySession == null) }
-    var showHistory by remember { mutableStateOf(false) }
+    var expanded by rememberSaveable { mutableStateOf(todaySession == null) }
+    var showHistory by rememberSaveable { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -997,14 +997,14 @@ fun ExerciseEditDialog(
         java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
     }
 
-    var selectedType by remember { mutableStateOf(session.sessionType) }
-    var durationInput by remember {
+    var selectedType by rememberSaveable { mutableStateOf(session.sessionType) }
+    var durationInput by rememberSaveable {
         mutableStateOf(session.durationMinutes.toString())
     }
-    var timestampInput by remember {
+    var timestampInput by rememberSaveable {
         mutableStateOf(fmt.format(java.util.Date(session.startTimestamp)))
     }
-    var confirmDelete by remember { mutableStateOf(false) }
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
 
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         Column(

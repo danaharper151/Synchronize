@@ -138,11 +138,20 @@ class MainActivity : FragmentActivity() {
         authService = AuthorizationService(this)
         dexcomAuthManager = DexcomAuthManager(this)
         lifecycleScope.launch {
-            if (dexcomAuthManager.isAuthenticated()) {
-                viewModel.setDexcomConnected(true)
-                android.util.Log.d("DexcomAuth", "Restored existing Dexcom connection on launch")
-            } else {
-                android.util.Log.d("DexcomAuth", "No existing Dexcom token found on launch")
+            when {
+                dexcomAuthManager.isAuthenticated() -> {
+                    viewModel.setDexcomConnected(true)
+                    android.util.Log.d("DexcomAuth", "Restored Dexcom connection")
+                }
+                dexcomAuthManager.hasStoredCredentials() -> {
+                    viewModel.setDexcomConnected(false)
+                    android.util.Log.w("DexcomAuth",
+                        "Stored credentials present but refresh failed — reauthorization required")
+                }
+                else -> {
+                    viewModel.setDexcomConnected(false)
+                    android.util.Log.d("DexcomAuth", "No Dexcom credentials stored")
+                }
             }
         }
 
@@ -160,19 +169,19 @@ class MainActivity : FragmentActivity() {
     // ── App content with biometric gate ───────────────────────
     @Composable
     fun AppContent() {
-        var isAuthenticated by remember { mutableStateOf(false) }
+        val isAuthenticated by viewModel.isUnlocked.collectAsState()
 
         if (!isAuthenticated) {
             LockScreen(
                 authManager = biometricAuthManager,
                 activity = this,
-                onAuthenticated = { isAuthenticated = true }
+                onAuthenticated = { viewModel.setUnlocked(true) }
             )
             LaunchedEffect(Unit) {
                 if (biometricAuthManager.canAuthenticate()) {
                     biometricAuthManager.authenticate(this@MainActivity)
                 } else {
-                    isAuthenticated = true
+                    viewModel.setUnlocked(true)
                 }
             }
         } else {
