@@ -38,7 +38,22 @@ object Constants {
     // ── Poll interval ─────────────────────────────────────────
     const val DEXCOM_POLL_INTERVAL_MS = 5 * 60 * 1000L  // 5 minutes
 
-    // ── Database ──────────────────────────────────────────────
+    // ── Keto-Mojo MyMojoHealth ────────────────────────────────
+    val MOJO_CLIENT_ID     = BuildConfig.MOJO_CLIENT_ID
+    val MOJO_CLIENT_SECRET = BuildConfig.MOJO_CLIENT_SECRET
+
+    const val MOJO_AUTH_BASE_URL = "https://auth.us.mymojohealth.com/"
+    const val MOJO_API_BASE_URL  = "https://api.us.mymojohealth.com/"
+
+    const val MOJO_AUTHORIZE_ENDPOINT = "oauth/authorize"
+    const val MOJO_TOKEN_ENDPOINT     = "api/v1/oauth/token"
+    const val MOJO_READINGS_ENDPOINT  = "api/v1/readings"
+
+    const val MOJO_REDIRECT_URI =
+        "https://danaharper151.github.io/synchronize-oauth/mojo/"
+
+    const val MOJO_SCOPE =
+        "readings:retrieve readings:stats:retrieve users:profile:retrieve"
 
 
     // ── Subject ───────────────────────────────────────────────

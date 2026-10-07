@@ -41,4 +41,7 @@ interface KetoneReadingDao {
 
     @Query("DELETE FROM ketone_readings WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("SELECT * FROM ketone_readings WHERE deviceTimestamp = :ts LIMIT 1")
+    suspend fun findByTimestamp(ts: Long): KetoneReading?
 }

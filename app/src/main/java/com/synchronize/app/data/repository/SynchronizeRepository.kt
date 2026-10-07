@@ -208,4 +208,20 @@ class SynchronizeRepository(private val db: SynchronizeDatabase) {
         "exercise" to getExerciseCount(),
         "covariates" to getCovariateCount()
     )
+    /**
+     * Inserts only readings whose deviceTimestamp is not already present,
+     * so repeated syncs do not duplicate. Returns the number inserted.
+     */
+    suspend fun insertKetoneReadingsIfNew(readings: List<KetoneReading>): Int {
+        val dao = db.ketoneReadingDao()
+        var inserted = 0
+        for (r in readings) {
+            val existing = dao.findByTimestamp(r.deviceTimestamp)
+            if (existing == null) {
+                dao.insert(r)
+                inserted++
+            }
+        }
+        return inserted
+    }
 }

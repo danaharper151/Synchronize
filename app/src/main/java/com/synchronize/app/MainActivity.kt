@@ -27,6 +27,7 @@ import net.openid.appauth.AuthorizationException
 import net.openid.appauth.AuthorizationResponse
 import net.openid.appauth.AuthorizationService
 import androidx.health.connect.client.PermissionController
+import com.synchronize.app.util.MojoAuthManager
 
 class MainActivity : FragmentActivity() {
 
@@ -87,6 +88,37 @@ class MainActivity : FragmentActivity() {
             }
         }
     }
+    // ── Keto-Mojo launcher ─────────────────────────────────
+    private lateinit var mojoAuthManager: MojoAuthManager
+
+    private val mojoAuthLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val data = result.data ?: return@registerForActivityResult
+        val authResponse = AuthorizationResponse.fromIntent(data)
+        val authException = AuthorizationException.fromIntent(data)
+
+        when {
+            authResponse != null -> lifecycleScope.launch {
+                val r = mojoAuthManager.exchangeCodeForTokens(authResponse)
+                if (r.isSuccess) {
+                    viewModel.setMojoConnected(true)
+                    android.util.Log.d("MojoAuth", "Connected")
+                } else {
+                    android.util.Log.e("MojoAuth",
+                        "Exchange failed: ${r.exceptionOrNull()?.message}")
+                }
+            }
+            authException != null ->
+                android.util.Log.e("MojoAuth", "Auth error: ${authException.message}")
+        }
+    }
+
+    fun launchMojoAuth() {
+        val req = mojoAuthManager.buildAuthRequest()
+        android.util.Log.d("MojoAuth", "authorize: ${req.toUri()}")
+        mojoAuthLauncher.launch(mojoAuthManager.getAuthIntent(authService))
+    }
 
     // ── Permission launchers ──────────────────────────────────
     private val requestMicPermission = registerForActivityResult(
@@ -134,6 +166,10 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
 
         // Initialize auth managers
+        mojoAuthManager = MojoAuthManager(this)
+        lifecycleScope.launch {
+            if (mojoAuthManager.isAuthenticated()) viewModel.setMojoConnected(true)
+        }
         biometricAuthManager = BiometricAuthManager(this)
         authService = AuthorizationService(this)
         dexcomAuthManager = DexcomAuthManager(this)

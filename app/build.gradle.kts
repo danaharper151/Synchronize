@@ -36,6 +36,10 @@ android {
             "\"${secret("DEXCOM_CLIENT_SECRET")}\"")
         buildConfigField("String", "DB_PASSPHRASE",
             "\"${secret("DB_PASSPHRASE")}\"")
+        buildConfigField("String", "MOJO_CLIENT_ID",
+            "\"${secret("MOJO_CLIENT_ID")}\"")
+        buildConfigField("String", "MOJO_CLIENT_SECRET",
+            "\"${secret("MOJO_CLIENT_SECRET")}\"")
 
 
     }

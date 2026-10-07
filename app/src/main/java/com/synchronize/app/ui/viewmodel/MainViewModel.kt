@@ -1,5 +1,6 @@
 package com.synchronize.app.ui.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -25,6 +26,7 @@ import com.synchronize.app.util.ReminderManager
 import kotlinx.coroutines.withContext
 import com.synchronize.app.data.db.entity.ExerciseSession
 import com.synchronize.app.data.db.entity.DailyCovariate
+import com.synchronize.app.util.MojoSyncManager
 import kotlinx.coroutines.flow.asStateFlow
 
 class MainViewModel(private val repository: SynchronizeRepository) : ViewModel() {
@@ -93,6 +95,8 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
         voiceInputManager?.stopListening()
         _isListening.value = false
     }
+
+
 
     // ── Daily covariates ──────────────────────────────────────────
     private val _caffeineMg = MutableStateFlow(400.0)
@@ -274,6 +278,24 @@ class MainViewModel(private val repository: SynchronizeRepository) : ViewModel()
 
     fun disconnectKetoMojo() {
         ketoMojoManager?.disconnect()
+    }
+    private val _isMojoConnected = MutableStateFlow(false)
+    val isMojoConnected: StateFlow<Boolean> = _isMojoConnected.asStateFlow()
+    fun setMojoConnected(v: Boolean) { _isMojoConnected.value = v }
+
+    private val _mojoSyncStatus = MutableStateFlow<String?>(null)
+    val mojoSyncStatus: StateFlow<String?> = _mojoSyncStatus.asStateFlow()
+
+    fun syncMojo(context: Context) {
+        viewModelScope.launch {
+            _mojoSyncStatus.value = "Syncing…"
+            val oneYearAgo = System.currentTimeMillis() - 365L * 24 * 60 * 60 * 1000
+            val result = MojoSyncManager(context, repository).syncReadings(oneYearAgo)
+            _mojoSyncStatus.value = result.fold(
+                onSuccess = { "$it new readings" },
+                onFailure = { "Failed: ${it.message}" }
+            )
+        }
     }
     // ── Health Connect ────────────────────────────────────────────
     private var healthConnectManager: HealthConnectManager? = null

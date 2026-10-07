@@ -71,6 +71,8 @@ fun DashboardScreen(viewModel: MainViewModel) {
     }
     val covariateDateKey by viewModel.covariateDateKey.collectAsState()
     val allCovariates by viewModel.allCovariates.collectAsState()
+    val isMojoConnected by viewModel.isMojoConnected.collectAsState()
+    val mojoStatus by viewModel.mojoSyncStatus.collectAsState()
 
 
 
@@ -149,7 +151,7 @@ fun DashboardScreen(viewModel: MainViewModel) {
             textAlign = TextAlign.Center
         )
         Text(
-            text = "Ketone Prediction Research Dashboard",
+            text = "Data Sync Platform",
             fontSize = 12.sp,
             color = SyncLightGray,
             modifier = Modifier.fillMaxWidth(),
@@ -255,16 +257,16 @@ fun DashboardScreen(viewModel: MainViewModel) {
             onSyncClick = { viewModel.syncDexcomFullHistory(context) }
         )
 
-        // ── Keto-Mojo card ────────────────────────────────────
-        KetoMojoCard(
-            bleState = bleState,
-            latestReading = latestKetoneReading,
-            onScanClick = {
-                viewModel.initKetoMojo(context)
-                viewModel.startKetoMojoScan()
-            },
-            onDisconnectClick = { viewModel.disconnectKetoMojo() }
+        // ── Keto-Mojo API card ────────────────────────────────
+        DexcomConnectCard(
+            isConnected = isMojoConnected,
+            glucoseCount = 0,
+            onConnectClick = { activity.launchMojoAuth() },
+            onSyncClick = { viewModel.syncMojo(context) }
         )
+        mojoStatus?.let {
+            Text(it, fontSize = 12.sp, color = SyncLightGray)
+        }
 
         // ── Health Connect / Galaxy Watch card ────────────────
         HealthConnectCard(

@@ -7,3 +7,5 @@ DEXCOM_CLIENT_SECRET=
 
 # SQLCipher database passphrase — any long random string
 DB_PASSPHRASE=
+MOJO_CLIENT_ID=
+MOJO_CLIENT_SECRET=
