@@ -2,11 +2,11 @@
 
 **A multimodal data-collection platform for N-of-1 wearable biosignal research.**
 
-Synchronize is an Android application that ingests continuous glucose, capillary blood ketone, smartwatch biosignal, sleep, dietary, and behavioral data into a single timestamped local database. It was built as the data-collection instrument for an MS Computer Science thesis at California State University Channel Islands:
+Synchronize is an Android application that collects continuous glucose, capillary blood ketone, smartwatch biosignal, sleep, dietary, and covariate data into a single timestamped local database. It was built as the data-collection instrument for an MS Computer Science thesis at California State University Channel Islands:
 
 > *Predicting Blood Ketone Levels from Consumer Wearable Biosignals: A Feature Ablation Study* (2026)
 
-The research question is whether a consumer smartwatch, alone or combined with a continuous glucose monitor, can stand in for direct capillary ketone measurement. Answering it required a month of aligned, multi-device data that no single vendor app could produce, so this app was built to collect it.
+The research question is whether a consumer smartwatch, alone or combined with a continuous glucose monitor and dietary macros, can stand in for direct capillary ketone measurement. Answering it required a month of aligned, multi-device data that no single vendor app could produce- this app was built to collect it.
 
 ![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF)
 ![Android](https://img.shields.io/badge/Android-14%2B%20(minSdk%2034)-3DDC84)
@@ -25,7 +25,7 @@ The research question is whether a consumer smartwatch, alone or combined with a
 | Tag / branch | What it is |
 |---|---|
 | [`v1.0-collection`](../../tree/v1.0-collection) | The exact build that collected the thesis dataset (30-day protocol, summer 2026). Cite this version when referring to the study apparatus. |
-| `master` | The collection build plus post-study ingestion work: Dexcom refresh-token rotation, Keto-Mojo cloud API sync with glucose pairing, credentials moved to build configuration, and UI consistency fixes. The database schema is identical to `v1.0-collection`. |
+| `master` | The collection build plus post-study integration work: Dexcom refresh-token rotation, Keto-Mojo cloud API sync with glucose pairing, credentials moved to build configuration, and UI consistency fixes. The database schema is identical to `v1.0-collection`. |
 
 ---
 
@@ -41,7 +41,7 @@ The research question is whether a consumer smartwatch, alone or combined with a
 | Exercise sessions | — | Manual entry (HIIT, core/stretch, rest, other) | Per session |
 | Daily covariates (caffeine, AM/PM meditation) | — | Manual entry | Per day |
 
-Every record carries two timestamps: `deviceTimestamp` (when the device says the measurement happened) and `receiveTimestamp` (when the app ingested it). Cloud APIs deliver data late and in batches, so separating the two is what makes cross-device alignment and latency auditing possible downstream.
+Every record carries two timestamps: `deviceTimestamp` (when the device says the measurement happened) and `receiveTimestamp` (when the app received it). Cloud APIs deliver data late and in batches, so separating the two is what makes cross-device alignment and latency auditing possible downstream.
 
 ---
 
@@ -213,3 +213,12 @@ Thesis advisor: Dr. Thoms.
 ## License
 
 [MIT](LICENSE)
+
+## Acknowledgments
+- **Dr. Thoms**: For thesis advising and guidance throughout the study
+- **CSUCI**: For a supportive, inspiring, and empowering learning environment
+- **Dexcom Developer Program**: For Individual Access API support
+- **Keto-Mojo**: For API access to meter readings
+- **Android Health Connect Team**: For a unified on-device health data layer
+- **Android Developers Community**: For comprehensive documentation and libraries
+- **Anthropic Claude**: For build assistance and debugging
