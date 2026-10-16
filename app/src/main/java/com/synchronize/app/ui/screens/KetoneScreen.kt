@@ -21,7 +21,6 @@ import com.synchronize.app.ui.viewmodel.MainViewModel
 import com.synchronize.app.util.Constants
 import java.text.SimpleDateFormat
 import java.util.*
-import androidx.compose.foundation.clickable
 import androidx.compose.runtime.saveable.rememberSaveable
 @Composable
 fun KetoneScreen(viewModel: MainViewModel) {
@@ -35,6 +34,8 @@ fun KetoneScreen(viewModel: MainViewModel) {
     }
     var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
     val readingToEdit = editingId?.let { id -> ketoneReadings.find { it.id == id } }
+    var deletingId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val readingToDelete = deletingId?.let { id -> ketoneReadings.find { it.id == id } }
     var manualBhb by rememberSaveable { mutableStateOf("") }
     var manualGlucose by rememberSaveable { mutableStateOf("") }
     var manualSystolic by rememberSaveable { mutableStateOf("") }
@@ -365,7 +366,8 @@ fun KetoneScreen(viewModel: MainViewModel) {
                 visible.forEach { reading ->
                     KetoneReadingRow(
                         reading = reading,
-                        onClick = { editingId = reading.id }
+                        onEdit = { editingId = reading.id },
+                        onDelete = { deletingId = reading.id }
                     )
                 }
 
@@ -399,6 +401,21 @@ fun KetoneScreen(viewModel: MainViewModel) {
                 editingId = null
             },
             onDismiss = { editingId = null }
+        )
+    }
+    readingToDelete?.let { reading ->
+        val formatter = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
+        ConfirmDeleteDialog(
+            title = "Delete Reading?",
+            message = "Delete the %.2f mmol/L reading from %s?".format(
+                reading.betaHydroxybutyrate,
+                formatter.format(Date(reading.deviceTimestamp))
+            ),
+            onConfirm = {
+                viewModel.deleteKetoneReading(reading.id)
+                deletingId = null
+            },
+            onDismiss = { deletingId = null }
         )
     }
 }
@@ -444,14 +461,17 @@ fun ContextChip(
 // ── Reading history row ───────────────────────────────────────
 
 @Composable
-fun KetoneReadingRow(reading: KetoneReading, onClick: () -> Unit = {}) {
+fun KetoneReadingRow(
+    reading: KetoneReading,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
     val formatter = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
     val time = formatter.format(Date(reading.deviceTimestamp))
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
             .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -480,6 +500,7 @@ fun KetoneReadingRow(reading: KetoneReading, onClick: () -> Unit = {}) {
                 color = ketoneStatusColor(reading.betaHydroxybutyrate)
             )
             Text(text = "mmol/L", fontSize = 10.sp, color = SyncLightGray)
+            EntryOptionsMenu(onEdit = onEdit, onDelete = onDelete)
         }
     }
     HorizontalDivider(color = SyncMidGray, thickness = 0.5.dp)

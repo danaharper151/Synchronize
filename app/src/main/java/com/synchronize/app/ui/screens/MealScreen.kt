@@ -224,7 +224,6 @@ fun MealEntryRow(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    var menuExpanded by rememberSaveable { mutableStateOf(false) }
     val formatter = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -270,44 +269,7 @@ fun MealEntryRow(
                 )
             }
 
-            // Three-dot menu
-            Box {
-                IconButton(
-                    onClick = { menuExpanded = true },
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = "Options",
-                        tint = SyncLightGray,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                DropdownMenu(
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false },
-                    containerColor = SyncDarkSurface
-                ) {
-                    DropdownMenuItem(
-                        text = {
-                            Text("Edit", color = SyncGreen, fontSize = 13.sp)
-                        },
-                        onClick = {
-                            menuExpanded = false
-                            onEdit()
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = {
-                            Text("Delete", color = SyncError, fontSize = 13.sp)
-                        },
-                        onClick = {
-                            menuExpanded = false
-                            onDelete()
-                        }
-                    )
-                }
-            }
+            EntryOptionsMenu(onEdit = onEdit, onDelete = onDelete)
         }
         HorizontalDivider(color = SyncMidGray, thickness = 0.5.dp)
     }

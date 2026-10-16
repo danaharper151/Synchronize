@@ -13,3 +13,11 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+synchronize_db*
+*.db
+.kotlin/
+
+synchronize_db*
+*.db
+.kotlin/

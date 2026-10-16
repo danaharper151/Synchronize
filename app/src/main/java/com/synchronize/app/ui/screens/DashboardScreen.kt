@@ -241,7 +241,8 @@ fun DashboardScreen(viewModel: MainViewModel) {
             onLog = { type, mins, ts ->
                 viewModel.logExerciseSession(type, mins, ts)
             },
-            onEditRequest = { editingExerciseId = it.id }
+            onEditRequest = { editingExerciseId = it.id },
+            onDelete = { id -> viewModel.deleteExerciseSession(id) }
         )
 
         // ── Data quality card ─────────────────────────────────
@@ -262,7 +263,9 @@ fun DashboardScreen(viewModel: MainViewModel) {
             isConnected = isMojoConnected,
             glucoseCount = 0,
             onConnectClick = { activity.launchMojoAuth() },
-            onSyncClick = { viewModel.syncMojo(context) }
+            onSyncClick = { viewModel.syncMojo(context) },
+            deviceName = "Keto-Mojo GK+",
+            showCount = false
         )
         mojoStatus?.let {
             Text(it, fontSize = 12.sp, color = SyncLightGray)
@@ -546,6 +549,7 @@ fun DailyCovariatesCard(
     var dateInput by rememberSaveable(dateKey) { mutableStateOf(dateKey) }
     var expanded by rememberSaveable { mutableStateOf(!isLogged) }
     var showHistory by rememberSaveable { mutableStateOf(false) }
+    var deletingCovariate by remember { mutableStateOf<DailyCovariate?>(null) }
 
     Column(
         modifier = Modifier
@@ -746,7 +750,6 @@ fun DailyCovariatesCard(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onDateChange(cov.dateKey) }
                             .padding(vertical = 6.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
@@ -756,19 +759,43 @@ fun DailyCovariatesCard(
                             fontSize = 11.sp,
                             color = SyncWhite
                         )
-                        Text(
-                            text = "${cov.caffeineMg.toInt()}mg · " +
-                                    "${cov.meditationAmMinutes}/${cov.meditationPmMinutes}m",
-                            fontSize = 10.sp,
-                            color = SyncLightGray
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "${cov.caffeineMg.toInt()}mg · " +
+                                        "${cov.meditationAmMinutes}/${cov.meditationPmMinutes}m",
+                                fontSize = 10.sp,
+                                color = SyncLightGray
+                            )
+                            EntryOptionsMenu(
+                                onEdit = {
+                                    // Load that day into the form above and open it
+                                    dateInput = cov.dateKey
+                                    onDateChange(cov.dateKey)
+                                    expanded = true
+                                },
+                                onDelete = { deletingCovariate = cov }
+                            )
+                        }
                     }
                     HorizontalDivider(color = SyncMidGray, thickness = 0.5.dp)
                 }
             }
         }
     }
+
+    deletingCovariate?.let { cov ->
+        ConfirmDeleteDialog(
+            title = "Delete Covariates?",
+            message = "Delete the covariate entry for ${cov.dateKey}?",
+            onConfirm = {
+                onDelete(cov.id)
+                deletingCovariate = null
+            },
+            onDismiss = { deletingCovariate = null }
+        )
+    }
 }
+
 // ── Exercise Card (with timestamp + history) ──────────────────
 
 @Composable
@@ -776,7 +803,8 @@ fun ExerciseCard(
     todaySession: ExerciseSession?,
     allSessions: List<ExerciseSession>,
     onLog: (type: String, durationMinutes: Int, startTimestamp: Long) -> Unit,
-    onEditRequest: (ExerciseSession) -> Unit
+    onEditRequest: (ExerciseSession) -> Unit,
+    onDelete: (Long) -> Unit
 ) {
     val fmt = remember {
         java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
@@ -792,6 +820,7 @@ fun ExerciseCard(
     }
     var expanded by rememberSaveable { mutableStateOf(todaySession == null) }
     var showHistory by rememberSaveable { mutableStateOf(false) }
+    var deletingSession by remember { mutableStateOf<ExerciseSession?>(null) }
 
     Column(
         modifier = Modifier
@@ -953,7 +982,6 @@ fun ExerciseCard(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onEditRequest(session) }
                             .padding(vertical = 6.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
@@ -972,17 +1000,36 @@ fun ExerciseCard(
                                 color = if (session.isHiit) SyncGreen else SyncLightGray
                             )
                         }
-                        Text(
-                            text = if (session.durationMinutes > 0)
-                                "${session.durationMinutes} min" else "—",
-                            fontSize = 11.sp,
-                            color = SyncLightGray
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = if (session.durationMinutes > 0)
+                                    "${session.durationMinutes} min" else "—",
+                                fontSize = 11.sp,
+                                color = SyncLightGray
+                            )
+                            EntryOptionsMenu(
+                                onEdit = { onEditRequest(session) },
+                                onDelete = { deletingSession = session }
+                            )
+                        }
                     }
                     HorizontalDivider(color = SyncMidGray, thickness = 0.5.dp)
                 }
             }
         }
+    }
+
+    deletingSession?.let { session ->
+        ConfirmDeleteDialog(
+            title = "Delete Session?",
+            message = "Delete the ${ExerciseSession.displayName(session.sessionType)} " +
+                    "session from ${displayFmt.format(java.util.Date(session.startTimestamp))}?",
+            onConfirm = {
+                onDelete(session.id)
+                deletingSession = null
+            },
+            onDismiss = { deletingSession = null }
+        )
     }
 }
 
@@ -1212,7 +1259,9 @@ fun DexcomConnectCard(
     isConnected: Boolean,
     glucoseCount: Int,
     onConnectClick: () -> Unit,
-    onSyncClick: () -> Unit
+    onSyncClick: () -> Unit,
+    deviceName: String = "Dexcom G7",
+    showCount: Boolean = true
 ) {
     Column(
         modifier = Modifier
@@ -1234,14 +1283,17 @@ fun DexcomConnectCard(
         ) {
             Column {
                 Text(
-                    text = "Dexcom G7",
+                    text = deviceName,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = if (isConnected) SyncGreen else SyncWhite
                 )
                 Text(
-                    text = if (isConnected) "$glucoseCount readings synced"
-                    else "Not connected",
+                    text = when {
+                        !isConnected -> "Not connected"
+                        showCount -> "$glucoseCount readings synced"
+                        else -> "Connected"
+                    },
                     fontSize = 11.sp,
                     color = SyncLightGray
                 )
@@ -1263,7 +1315,7 @@ fun DexcomConnectCard(
                 colors = ButtonDefaults.buttonColors(containerColor = SyncMagenta)
             ) {
                 Text(
-                    text = "Connect Dexcom G7",
+                    text = "Connect $deviceName",
                     color = SyncBlack,
                     fontWeight = FontWeight.Bold
                 )
@@ -1542,17 +1594,18 @@ fun HealthConnectCard(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            val canGrant = hcState is HealthConnectManager.HcState.PermissionsRequired
             Button(
                 onClick = onSyncClick,
                 modifier = Modifier.weight(1f),
-                enabled = isReady,
+                enabled = isReady || canGrant,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = SyncGreen,
+                    containerColor = if (isReady) SyncGreen else SyncMagenta,
                     disabledContainerColor = SyncMidGray
                 )
             ) {
                 Text(
-                    text = "Sync Biosignals",
+                    text = if (canGrant) "Grant Access" else "Sync Biosignals",
                     color = SyncBlack,
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp

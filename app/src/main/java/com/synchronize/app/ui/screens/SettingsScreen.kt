@@ -11,23 +11,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.synchronize.app.BuildConfig
 import com.synchronize.app.ui.theme.*
 import com.synchronize.app.ui.viewmodel.MainViewModel
 import com.synchronize.app.util.Constants
-import com.synchronize.app.util.DexcomAuthManager
-import kotlinx.coroutines.launch
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-
 
 @Composable
 fun SettingsScreen(viewModel: MainViewModel) {
@@ -50,55 +42,10 @@ fun SettingsScreen(viewModel: MainViewModel) {
             textAlign = TextAlign.Center
         )
 
-
-
-        // ── Study configuration ───────────────────────────────
-        SettingsSection(title = "Study Configuration") {
-            SettingsInfoRow("Subject ID", Constants.SUBJECT_ID)
-            SettingsInfoRow("Data collection", "30-day longitudinal")
-            SettingsInfoRow("Ketone readings/day", "4–5 at standardized times")
-            SettingsInfoRow("ML models", "Rocket + Random Forest")
-            SettingsInfoRow("Evaluation", "Leave-One-Out CV (LOOCV)")
-        }
-
-        // ── Device configuration ──────────────────────────────
-        SettingsSection(title = "Devices") {
-            SettingsInfoRow("CGM", "Dexcom G7 — 5-min poll interval")
-            SettingsInfoRow("Smartwatch", "Samsung Galaxy Watch 7")
-            SettingsInfoRow("Ketone meter", "Keto-Mojo GK+ via BLE")
-            SettingsInfoRow("Environment", if (Constants.USE_SANDBOX) "Sandbox" else "Production")
-        }
-
-        // ── Clinical thresholds ───────────────────────────────
-        SettingsSection(title = "Clinical Thresholds") {
-            SettingsInfoRow("Glucose low", "${Constants.GLUCOSE_LOW} mg/dL")
-            SettingsInfoRow("Glucose high", "${Constants.GLUCOSE_HIGH} mg/dL")
-            SettingsInfoRow("Ketosis threshold", "${Constants.KETONE_SUB_KETOSIS} mmol/L")
-            SettingsInfoRow("Nutritional ketosis", "0.5 – ${Constants.KETONE_NUTRITIONAL} mmol/L")
-            SettingsInfoRow("Elevated ketones", "> ${Constants.KETONE_ELEVATED} mmol/L")
-        }
-
-        // ── Security ──────────────────────────────────────────
-        SettingsSection(title = "Security & Privacy") {
-            SettingsInfoRow("Database encryption", "SQLCipher AES-256")
-            SettingsInfoRow("API transport", "HTTPS with certificate pinning")
-            SettingsInfoRow("Authentication", "BiometricPrompt")
-            SettingsInfoRow("De-identification", "Timestamp offset + PII suppression")
-            SettingsInfoRow("Public release", "PhysioNet on thesis completion")
-        }
-
-        // ── About ─────────────────────────────────────────────
-        SettingsSection(title = "About Synchronize") {
-            SettingsInfoRow("Version", "1.0.0 — Development build")
-            SettingsInfoRow("Platform", "Android 14+ / Kotlin / Jetpack Compose")
-            SettingsInfoRow("Architecture", "MVVM + Room + Coroutines")
-            SettingsInfoRow("Repository", "github.com/danaharper151/Synchronize")
-            SettingsInfoRow("Thesis", "MSCS — CSUCI 2025")
-        }
-
+        // ── Reading reminders (interactive) ───────────────────
         SettingsSection(title = "Reading Reminders") {
             val remindersEnabled by viewModel.remindersEnabled.collectAsState()
-            val context = androidx.compose.ui.platform.LocalContext.current
+            val context = LocalContext.current
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -140,13 +87,15 @@ fun SettingsScreen(viewModel: MainViewModel) {
                 )
             }
         }
+
+        // ── Data backup (interactive) ─────────────────────────
         SettingsSection(title = "Data Backup") {
-            val ctx = androidx.compose.ui.platform.LocalContext.current
+            val ctx = LocalContext.current
             var backupMsg by remember { mutableStateOf<String?>(null) }
 
             Text(
-                text = "Back up the database daily. Files are saved to app storage " +
-                        "and survive rebuilds.",
+                text = "Copies the database to app storage. Back up daily during " +
+                        "collection; backups survive app rebuilds but not an uninstall.",
                 fontSize = 11.sp,
                 color = SyncLightGray
             )
@@ -165,43 +114,55 @@ fun SettingsScreen(viewModel: MainViewModel) {
             }
         }
 
-        // ── Danger zone ───────────────────────────────────────
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(SyncDarkSurface)
-                .border(1.dp, SyncError, RoundedCornerShape(12.dp))
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        // ── Study protocol (as run) ───────────────────────────
+        SettingsSection(title = "Study Protocol") {
+            SettingsInfoRow("Subject ID", Constants.SUBJECT_ID)
+            SettingsInfoRow("Design", "N-of-1, 30-day self-collection")
+            SettingsInfoRow("Ketone readings/day", "5 scheduled reading contexts")
+            SettingsInfoRow("Models", "Random Forest, XGBoost (ablation A–D)")
+            SettingsInfoRow("Evaluation", "Leave-one-day-out (primary), LOOCV")
+        }
+
+        // ── Data sources ──────────────────────────────────────
+        SettingsSection(title = "Data Sources") {
+            SettingsInfoRow("CGM", "Dexcom G7 — Dexcom API (OAuth), 5-min EGVs")
+            SettingsInfoRow("Ketone meter", "Keto-Mojo GK+ — Keto-Mojo API + manual entry")
+            SettingsInfoRow("Smartwatch", "Galaxy Watch 7 — Health Connect + Samsung exports")
+            SettingsInfoRow("Diet", "Voice logging (Android SpeechRecognizer)")
+            SettingsInfoRow("API environment", if (Constants.USE_SANDBOX) "Sandbox" else "Production")
+        }
+
+        // ── Display thresholds ────────────────────────────────
+        SettingsSection(title = "Display Thresholds") {
+            SettingsInfoRow("Glucose low", "${Constants.GLUCOSE_LOW} mg/dL")
+            SettingsInfoRow("Glucose high", "${Constants.GLUCOSE_HIGH} mg/dL")
+            SettingsInfoRow("Ketosis threshold", "${Constants.KETONE_SUB_KETOSIS} mmol/L")
+            SettingsInfoRow("Nutritional ketosis", "0.5 – ${Constants.KETONE_NUTRITIONAL} mmol/L")
+            SettingsInfoRow("Elevated ketones", "> ${Constants.KETONE_ELEVATED} mmol/L")
             Text(
-                text = "Developer Tools",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = SyncError
-            )
-            Text(
-                text = "These options are for development only and will be removed before production deployment.",
-                fontSize = 11.sp,
+                text = "Used for color-coding only. Not a diagnostic tool.",
+                fontSize = 10.sp,
                 color = SyncLightGray
             )
-            OutlinedButton(
-                onClick = { /* Switch sandbox/production */ },
-                modifier = Modifier.fillMaxWidth(),
-                border = ButtonDefaults.outlinedButtonBorder.copy(
-                    brush = androidx.compose.ui.graphics.SolidColor(SyncError)
-                )
-            ) {
-                Text(
-                    text = if (Constants.USE_SANDBOX)
-                        "Currently: Sandbox — tap to switch to Production"
-                    else
-                        "Currently: Production — tap to switch to Sandbox",
-                    color = SyncError,
-                    fontSize = 12.sp
-                )
-            }
+        }
+
+        // ── Storage & privacy ─────────────────────────────────
+        SettingsSection(title = "Storage & Privacy") {
+            SettingsInfoRow("Storage", "Room / SQLite, app-private, on-device")
+            SettingsInfoRow("App lock", "Biometric (BiometricPrompt)")
+            SettingsInfoRow("Database encryption", "Not encrypted")
+            SettingsInfoRow("API transport", "HTTPS (TLS)")
+            SettingsInfoRow("API credentials", "BuildConfig — not committed to source")
+            SettingsInfoRow("Data access", "Extracted via adb for analysis")
+        }
+
+        // ── About ─────────────────────────────────────────────
+        SettingsSection(title = "About Synchronize") {
+            SettingsInfoRow("Version", BuildConfig.VERSION_NAME)
+            SettingsInfoRow("Platform", "Android · Kotlin · Jetpack Compose")
+            SettingsInfoRow("Architecture", "MVVM + Room + Coroutines")
+            SettingsInfoRow("Repository", "github.com/danaharper151/Synchronize")
+            SettingsInfoRow("Thesis", "MSCS — CSU Channel Islands, 2026")
         }
     }
 }

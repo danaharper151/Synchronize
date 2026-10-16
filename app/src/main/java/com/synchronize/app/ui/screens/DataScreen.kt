@@ -21,19 +21,18 @@ import com.synchronize.app.ui.viewmodel.MainViewModel
 @Composable
 fun DataScreen(viewModel: MainViewModel) {
 
-    val dataQuality by viewModel.dataQuality.collectAsState()
     val allGlucose by viewModel.allGlucoseReadings.collectAsState()
     val allKetones by viewModel.allKetoneReadings.collectAsState()
     val allBiosignals by viewModel.allBiosignalSamples.collectAsState()
     val allSleep by viewModel.allSleepSessions.collectAsState()
     val allMeals by viewModel.allMealEntries.collectAsState()
 
-    // Target counts for 30-day study
-    val targetKetones   = 135  // 4.5/day × 30 days
-    val targetMeals     = 90   // 3/day × 30 days
-    val targetSleep     = 30   // 1/night × 30 nights
-    val targetGlucose   = 8640 // 288/day × 30 days
-    val targetBiosignals = 43200 // 1440/day × 30 days
+    // Protocol targets for a 30-day collection period
+    val targetKetones    = 150    // 5 scheduled contexts × 30 days
+    val targetMeals      = 90     // 3/day × 30 days
+    val targetSleep      = 30     // 1/night × 30 nights
+    val targetGlucose    = 8640   // 288 EGVs/day (5-min) × 30 days
+    val targetBiosignals = 43200  // 1440/day (1-min) × 30 days
 
     Column(
         modifier = Modifier
@@ -53,65 +52,24 @@ fun DataScreen(viewModel: MainViewModel) {
             textAlign = TextAlign.Center
         )
 
-        // ── Overall progress ──────────────────────────────────
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(SyncDarkSurface)
-                .border(1.dp, SyncMagenta, RoundedCornerShape(12.dp))
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        // ── Progress against protocol targets ─────────────────
+        DataCard {
             Text(
-                text = "30-Day Study Progress",
+                text = "30-Day Protocol Progress",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = SyncGreen
             )
 
-            DataProgressRow(
-                label = "Blood Ketones",
-                current = allKetones.size,
-                target = targetKetones,
-                unit = "readings"
-            )
-            DataProgressRow(
-                label = "Meal Entries",
-                current = allMeals.size,
-                target = targetMeals,
-                unit = "entries"
-            )
-            DataProgressRow(
-                label = "Sleep Sessions",
-                current = allSleep.size,
-                target = targetSleep,
-                unit = "nights"
-            )
-            DataProgressRow(
-                label = "CGM Readings",
-                current = allGlucose.size,
-                target = targetGlucose,
-                unit = "readings"
-            )
-            DataProgressRow(
-                label = "Biosignal Samples",
-                current = allBiosignals.size,
-                target = targetBiosignals,
-                unit = "samples"
-            )
+            DataProgressRow("Blood Ketones", allKetones.size, targetKetones, "readings")
+            DataProgressRow("Meal Entries", allMeals.size, targetMeals, "entries")
+            DataProgressRow("Sleep Sessions", allSleep.size, targetSleep, "nights")
+            DataProgressRow("CGM Readings", allGlucose.size, targetGlucose, "readings")
+            DataProgressRow("Biosignal Samples", allBiosignals.size, targetBiosignals, "samples")
         }
 
-        // ── Stream status ─────────────────────────────────────
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(SyncDarkSurface)
-                .border(1.dp, SyncMagenta, RoundedCornerShape(12.dp))
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
+        // ── Stream summary ────────────────────────────────────
+        DataCard {
             Text(
                 text = "Stream Summary",
                 fontSize = 14.sp,
@@ -147,37 +105,40 @@ fun DataScreen(viewModel: MainViewModel) {
             }
         }
 
-        // ── Export card ───────────────────────────────────────
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(SyncDarkSurface)
-                .border(1.dp, SyncMagenta, RoundedCornerShape(12.dp))
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        // ── Analysis hand-off ─────────────────────────────────
+        DataCard {
             Text(
-                text = "Dataset Export",
+                text = "Analysis Pipeline",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = SyncGreen
             )
             Text(
-                text = "Export de-identified CSV bundle for PhysioNet submission. " +
-                        "All timestamps will be offset by a randomized delta and PII fields suppressed.",
+                text = "Records stay on-device in the app database. For analysis, the " +
+                        "database is extracted over adb and processed by the companion " +
+                        "Python pipeline (synchronize-pipeline), which builds the " +
+                        "multi-resolution feature windows used for model training.",
                 fontSize = 12.sp,
                 color = SyncLightGray
             )
-            Button(
-                onClick = { /* Export pipeline — wired in next step */ },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = SyncDarkGray)
-            ) {
-                Text("Export Dataset (CSV)", color = SyncGreen)
-            }
         }
     }
+}
+
+// ── Card wrapper ──────────────────────────────────────────────
+
+@Composable
+private fun DataCard(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(SyncDarkSurface)
+            .border(1.dp, SyncMagenta, RoundedCornerShape(12.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        content = content
+    )
 }
 
 // ── Progress row with linear indicator ───────────────────────
