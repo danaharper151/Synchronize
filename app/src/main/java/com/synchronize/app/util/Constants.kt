@@ -12,7 +12,7 @@ object Constants {
     const val DEXCOM_SCOPE         = "offline_access"
     val DEXCOM_CLIENT_ID     = BuildConfig.DEXCOM_CLIENT_ID
     val DEXCOM_CLIENT_SECRET = BuildConfig.DEXCOM_CLIENT_SECRET
-    val DB_PASSPHRASE        = BuildConfig.DB_PASSPHRASE
+
 
 
     // Sandbox (development) — switch to PROD_BASE_URL when ready for real data

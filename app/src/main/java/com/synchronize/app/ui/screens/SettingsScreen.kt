@@ -21,6 +21,15 @@ import com.synchronize.app.ui.theme.*
 import com.synchronize.app.ui.viewmodel.MainViewModel
 import com.synchronize.app.util.Constants
 
+/**
+ * Settings.
+ *
+ * Two sections are interactive; the rest report configuration. Each reported
+ * value names the file that defines it, so a researcher adapting the
+ * application to a different protocol can find what to change without
+ * reading the whole source tree. Protocol parameters are compile-time
+ * constants in this version.
+ */
 @Composable
 fun SettingsScreen(viewModel: MainViewModel) {
 
@@ -79,13 +88,13 @@ fun SettingsScreen(viewModel: MainViewModel) {
                 )
             }
 
-            if (remindersEnabled) {
-                Text(
-                    text = "Daily reminders active for all 5 reading contexts",
-                    fontSize = 11.sp,
-                    color = SyncLightGray
-                )
-            }
+            Text(
+                text = "One reminder per reading context, through AlarmManager with " +
+                        "a boot-persistent receiver. Times are defined in " +
+                        "ReminderManager.kt.",
+                fontSize = 11.sp,
+                color = SyncLightGray
+            )
         }
 
         // ── Data backup (interactive) ─────────────────────────
@@ -114,33 +123,60 @@ fun SettingsScreen(viewModel: MainViewModel) {
             }
         }
 
-        // ── Study protocol (as run) ───────────────────────────
-        SettingsSection(title = "Study Protocol") {
-            SettingsInfoRow("Subject ID", Constants.SUBJECT_ID)
-            SettingsInfoRow("Design", "N-of-1, 30-day self-collection")
-            SettingsInfoRow("Ketone readings/day", "5 scheduled reading contexts")
-            SettingsInfoRow("Models", "Random Forest, XGBoost (ablation A–D)")
-            SettingsInfoRow("Evaluation", "Leave-one-day-out (primary), LOOCV")
+        // ── Collection protocol ───────────────────────────────
+        //
+        // Replaces the former "Study Protocol" section. That section described
+        // the study this application was built for, including the model
+        // architectures and cross-validation scheme — neither of which is in
+        // this application. Both belong to the analysis pipeline, which is a
+        // separate repository.
+        SettingsSection(title = "Collection Protocol") {
+            Text(
+                text = "Fixed at compile time in this version. Each row names the " +
+                        "file that defines it.",
+                fontSize = 11.sp,
+                color = SyncLightGray
+            )
+            SettingsInfoRow("Subject identifier", Constants.SUBJECT_ID)
+            SettingsInfoRow("Reading contexts", "5 — Constants.kt")
+            SettingsInfoRow("Reminder times", "5 daily — ReminderManager.kt")
+            SettingsInfoRow("Exercise types", "ExerciseSession.kt")
+            SettingsInfoRow("Daily covariates", "DailyCovariate.kt")
+            Text(
+                text = "Every table carries a subject identifier, so multi-subject " +
+                        "collection needs no schema migration.",
+                fontSize = 10.sp,
+                color = SyncLightGray
+            )
         }
 
         // ── Data sources ──────────────────────────────────────
         SettingsSection(title = "Data Sources") {
-            SettingsInfoRow("CGM", "Dexcom G7 — Dexcom API (OAuth), 5-min EGVs")
-            SettingsInfoRow("Ketone meter", "Keto-Mojo GK+ — Keto-Mojo API + manual entry")
-            SettingsInfoRow("Smartwatch", "Galaxy Watch 7 — Health Connect + Samsung exports")
+            SettingsInfoRow("CGM", "Dexcom API (OAuth 2.0 + PKCE), 5-min EGVs")
+            SettingsInfoRow("Ketone meter", "Keto-Mojo API + manual entry")
+            SettingsInfoRow("Smartwatch", "Health Connect + vendor export parsing")
             SettingsInfoRow("Diet", "Voice logging (Android SpeechRecognizer)")
             SettingsInfoRow("API environment", if (Constants.USE_SANDBOX) "Sandbox" else "Production")
+            Text(
+                text = "Health Connect supplies three of seven watch streams. The " +
+                        "remainder are recovered from weekly vendor exports by the " +
+                        "analysis pipeline.",
+                fontSize = 10.sp,
+                color = SyncLightGray
+            )
         }
 
         // ── Display thresholds ────────────────────────────────
         SettingsSection(title = "Display Thresholds") {
             SettingsInfoRow("Glucose low", "${Constants.GLUCOSE_LOW} mg/dL")
             SettingsInfoRow("Glucose high", "${Constants.GLUCOSE_HIGH} mg/dL")
+            SettingsInfoRow("Glucose very high", "${Constants.GLUCOSE_VERY_HIGH} mg/dL")
             SettingsInfoRow("Ketosis threshold", "${Constants.KETONE_SUB_KETOSIS} mmol/L")
-            SettingsInfoRow("Nutritional ketosis", "0.5 – ${Constants.KETONE_NUTRITIONAL} mmol/L")
+            SettingsInfoRow("Nutritional ketosis", "${Constants.KETONE_SUB_KETOSIS} – ${Constants.KETONE_NUTRITIONAL} mmol/L")
             SettingsInfoRow("Elevated ketones", "> ${Constants.KETONE_ELEVATED} mmol/L")
             Text(
-                text = "Used for color-coding only. Not a diagnostic tool.",
+                text = "Color-coding only. Not a diagnostic tool. Defined in " +
+                        "Constants.kt.",
                 fontSize = 10.sp,
                 color = SyncLightGray
             )
@@ -152,8 +188,16 @@ fun SettingsScreen(viewModel: MainViewModel) {
             SettingsInfoRow("App lock", "Biometric (BiometricPrompt)")
             SettingsInfoRow("Database encryption", "Not encrypted")
             SettingsInfoRow("API transport", "HTTPS (TLS)")
-            SettingsInfoRow("API credentials", "BuildConfig — not committed to source")
+            SettingsInfoRow("API credentials", "BuildConfig, from local.properties")
             SettingsInfoRow("Data access", "Extracted via adb for analysis")
+            Text(
+                text = "Collected data is stored unencrypted on the device. Use " +
+                        "device-level encryption and a screen lock. Encryption at " +
+                        "rest, certificate pinning and audit logging are not " +
+                        "implemented; see the README.",
+                fontSize = 10.sp,
+                color = SyncLightGray
+            )
         }
 
         // ── About ─────────────────────────────────────────────
@@ -161,8 +205,14 @@ fun SettingsScreen(viewModel: MainViewModel) {
             SettingsInfoRow("Version", BuildConfig.VERSION_NAME)
             SettingsInfoRow("Platform", "Android · Kotlin · Jetpack Compose")
             SettingsInfoRow("Architecture", "MVVM + Room + Coroutines")
+            SettingsInfoRow("License", "MIT")
             SettingsInfoRow("Repository", "github.com/danaharper151/Synchronize")
-            SettingsInfoRow("Thesis", "MSCS — CSU Channel Islands, 2026")
+            Text(
+                text = "Built as the data collection instrument for an M.S. Computer " +
+                        "Science thesis at CSU Channel Islands, 2026.",
+                fontSize = 10.sp,
+                color = SyncLightGray
+            )
         }
     }
 }
