@@ -17,6 +17,9 @@ import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
 import com.synchronize.app.ui.theme.*
 import com.synchronize.app.util.BiometricAuthManager
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import com.synchronize.app.R
 
 @Composable
 fun LockScreen(
@@ -53,10 +56,9 @@ fun LockScreen(
                     .background(SyncDarkSurface),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Favorite,
+                Image(
+                    painter = painterResource(id = R.drawable.sync),
                     contentDescription = "Synchronize",
-                    tint = SyncGreen,
                     modifier = Modifier.size(52.dp)
                 )
             }
@@ -73,9 +75,9 @@ fun LockScreen(
                     color = SyncGreen
                 )
                 Text(
-                    text = "Ketone Prediction Research",
+                    text = "Data Collection Platform",
                     fontSize = 13.sp,
-                    color = SyncLightGray,
+                    color = SyncMagenta,
                     textAlign = TextAlign.Center
                 )
             }
@@ -86,7 +88,7 @@ fun LockScreen(
             when (authState) {
                 is BiometricAuthManager.AuthState.Unauthenticated -> {
                     Text(
-                        text = "Authentication required\nto access health data",
+                        text = "Authentication required",
                         fontSize = 13.sp,
                         color = SyncLightGray,
                         textAlign = TextAlign.Center
@@ -147,9 +149,9 @@ fun LockScreen(
 
             // ── Security note ─────────────────────────────────
             Text(
-                text = "Your health data is encrypted at rest\nand protected by device authentication.",
+                text = "Sync CGM, Smartwatch, Ketones, and Macros",
                 fontSize = 10.sp,
-                color = SyncMidGray,
+                color = SyncGreen,
                 textAlign = TextAlign.Center,
                 lineHeight = 14.sp
             )
