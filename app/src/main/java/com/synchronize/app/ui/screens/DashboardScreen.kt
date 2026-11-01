@@ -151,9 +151,9 @@ fun DashboardScreen(viewModel: MainViewModel) {
             textAlign = TextAlign.Center
         )
         Text(
-            text = "Data Sync Platform",
+            text = "Data Collection Platform",
             fontSize = 12.sp,
-            color = SyncLightGray,
+            color = SyncMagenta,
             modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.Center
         )
