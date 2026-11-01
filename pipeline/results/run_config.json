@@ -1,0 +1,13 @@
+{
+  "seed": 42,
+  "sentinel": -999.0,
+  "ketosis_threshold": 0.5,
+  "n_labels": 140,
+  "n_days": 30,
+  "naive_rmse": 0.6581711674893437,
+  "prefix": "",
+  "models": [
+    "RandomForest",
+    "XGBoost"
+  ]
+}

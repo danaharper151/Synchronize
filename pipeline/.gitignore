@@ -1,0 +1,25 @@
+# Raw and derived health data never enter version control.
+raw_exports/
+samsung_export/
+samsung_parsed*/
+features*/
+inventory*/
+inventory_*.json
+inventory_*.txt
+dashboard_data*.json
+test_output/
+synchronize_dataset/
+test_synchronize_db
+*.csv
+*.db
+
+# Aggregate results reported in the thesis are small and contain no readings.
+!results/*.csv
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+figures*.zip
+console_output*.txt
