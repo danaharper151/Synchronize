@@ -77,7 +77,7 @@ flowchart LR
     REPO <--> DB
     VM --> SCR
 
-    DB -- adb extraction --> PIPE[Python feature pipeline<br/>synchronize-pipeline]
+    DB -- adb extraction --> PIPE[Python analysis pipeline<br/>pipeline/]
 ```
 
 - **Pattern:** MVVM. Compose screens observe `StateFlow`s exposed by a single `MainViewModel`, which talks to a repository over Room DAOs.
@@ -165,13 +165,14 @@ adb exec-out run-as com.synchronize.app cat databases/synchronize_db-wal > synch
 
 ## Analysis
 
-The companion repository **synchronize-pipeline** turns the extracted database and vendor exports into model-ready features:
+The [`pipeline/`](pipeline/) directory holds the Python tooling that turns the extracted database and vendor exports into model-ready features, models, and the thesis results:
 
+- Parsers for the Samsung Health, Dexcom Clarity, and Keto-Mojo exports, each of which has undocumented defects that fail silently (trailing delimiters, dissociated headers, tables that disagree on UTC versus local time), with a diagnostic script for each
 - Multi-resolution windows (30, 60 and 120 minutes, plus an overnight sleep vector) anchored to each ketone reading
 - A four-model feature ablation (A–D) varying which sensor streams are available
 - Random Forest and XGBoost regressors, evaluated with leave-one-day-out cross-validation (primary, 30 folds) and LOOCV
 
-In the study, CGM-derived features carried the predictive signal, and the smartwatch-only model did not hold up under leave-one-day-out validation. Full results and methodology are in the thesis.
+In the study, CGM-derived features carried the predictive signal, and the smartwatch-only model did not hold up under leave-one-day-out validation. Full results and methodology are in the thesis; the pipeline [README](pipeline/README.md) documents every export defect and how to run each stage.
 
 ---
 
@@ -179,7 +180,7 @@ In the study, CGM-derived features carried the predictive signal, and the smartw
 
 These are stated plainly so anyone reusing the platform knows what they are getting:
 
-- **Single subject.** The app was built for one participant; the subject ID (`subject_001`), reading contexts, and reminder times are compile-time constants. A configurable version is in progress on the `configurable-wip` branch.
+- **Single subject.** The app was built for one participant; the subject ID (`subject_001`), reading contexts, and reminder times are compile-time constants. This repository preserves the thesis instrument as collected; a configurable, multi-participant platform is planned as a separate application.
 - **Database is not encrypted.** The SQLCipher dependency and passphrase plumbing are present, but the Room database is not yet opened through SQLCipher.
 - **Manual and API ketone readings can duplicate.** The sync's duplicate check matches exact device timestamps, so a reading entered by hand and later synced from the API is stored twice. These are removed in the analysis pipeline.
 - **Health Connect resolution.** Watch data arrives at whatever granularity Samsung Health writes to Health Connect. Several `biosignal_samples` columns (ECG, raw PPG, stress score) are reserved and are not populated through Health Connect.

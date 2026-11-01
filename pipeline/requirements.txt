@@ -1,0 +1,11 @@
+# Analysis pipeline for Synchronize. Python 3.10+.
+# pandas and numpy are the versions the thesis results were produced with.
+pandas==2.3.3
+numpy==2.3.4
+scikit-learn>=1.4
+xgboost>=2.0
+scipy>=1.11
+joblib>=1.3
+
+# Optional: plots in analysis/clarke_error_grid.py and analysis/check_glucose_direction.py
+matplotlib>=3.8
